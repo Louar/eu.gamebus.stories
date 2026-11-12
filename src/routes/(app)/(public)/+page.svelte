@@ -66,9 +66,7 @@
 					<div class="space-y-2">
 						<Card.Title class="text-2xl tracking-tight sm:text-3xl">{client.name}</Card.Title>
 						{#if client.description}
-							<Card.Description
-								class="prose prose-sm max-w-2xl text-accent-foreground/75"
-							>
+							<Card.Description class="prose prose-sm max-w-2xl text-accent-foreground/75">
 								<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 								{@html client.description}
 							</Card.Description>
@@ -81,9 +79,8 @@
 		{#each anthologies as anthology, index (anthology.id)}
 			<Card.Root class="pt-0 {anthologyCardClass(index)}">
 				<a
-					href={resolve('/(app)/(public)/(2-story-module)/[anthologySlug]/[...settings]', {
-						anthologySlug: anthology.slug,
-						settings: ''
+					href={resolve('/(app)/(public)/(2-story-module)/[anthologySlug]', {
+						anthologySlug: anthology.slug
 					})}
 					class="flex h-full flex-col focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
 				>

@@ -228,6 +228,13 @@
 
 <Header>
 	<div class="mx-auto flex w-full max-w-7xl items-center px-4 py-8 sm:px-6 lg:px-8">
+		<a
+			href={resolve('/')}
+			class="mr-3 inline-flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+			aria-label="Back to home"
+		>
+			<ArrowLeftIcon class="size-5" />
+		</a>
 		<h1 class="overflow-hidden text-base whitespace-nowrap">
 			{anthology.name ?? anthology.slug}
 		</h1>
@@ -276,7 +283,14 @@
 				>
 					<a
 						class="absolute inset-0 z-10 rounded-xl focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:outline-hidden"
-						href={resolve(`/s/${story.slug}` as '/s/[storySlug]/[...settings]')}
+						href={resolve(
+							'/(app)/(public)/(2-story-module)/[anthologySlug]/[storySlug]/[...settings]',
+							{
+								anthologySlug: anthology.slug,
+								storySlug: story.slug,
+								settings: ''
+							}
+						)}
 						aria-label={m.story_grid_open_story({ storyName: story.name ?? story.slug })}
 						onpointerdown={() => prepareStoryTransition(story.slug)}
 						onclick={(event) => openStory(event, story, i)}

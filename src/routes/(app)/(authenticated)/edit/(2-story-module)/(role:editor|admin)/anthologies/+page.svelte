@@ -218,7 +218,9 @@
 		{
 			id: 'thumbnail',
 			accessorFn: (row) =>
-				fileCellMediaToFileCellData(translateLocalizedMediaField(row.thumbnail, UI.language) ?? null),
+				fileCellMediaToFileCellData(
+					translateLocalizedMediaField(row.thumbnail, UI.language) ?? null
+				),
 			header: 'Thumbnail',
 			size: 240,
 			meta: {
@@ -321,7 +323,7 @@
 				clientId: false,
 				createdAt: false,
 				createdBy: false,
-				configuration: false,
+				configuration: false
 			},
 			columnPinning: { start: ['select-row'], end: [] }
 		}
@@ -411,7 +413,15 @@
 		{table}
 		height={gridHeight}
 		display="grid"
-		cardFields={['nameRaw', 'slug', 'order', 'description', 'visualization', 'isPublished', 'isPublic']}
+		cardFields={[
+			'nameRaw',
+			'slug',
+			'order',
+			'description',
+			'visualization',
+			'isPublished',
+			'isPublic'
+		]}
 	>
 		{#snippet card(anthology, fields)}
 			{@const thumbnail = translateLocalizedMediaField(anthology.thumbnail, UI.language)}
@@ -440,9 +450,8 @@
 			>
 				<a href={resolve(`/edit/anthologies/${anthology.id}/permissions`)}>Permissions</a>
 				<a
-					href={resolve('/(app)/(public)/(2-story-module)/[anthologySlug]/[...settings]', {
-						anthologySlug: anthology.slug,
-						settings: ''
+					href={resolve('/(app)/(public)/(2-story-module)/[anthologySlug]', {
+						anthologySlug: anthology.slug
 					})}>View anthology</a
 				>
 			</div>

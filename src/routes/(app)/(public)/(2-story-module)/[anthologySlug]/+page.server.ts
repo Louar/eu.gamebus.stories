@@ -1,8 +1,8 @@
 import type { Player } from '$lib/components/app/player/types';
 import { findOneAnthologyBySlug, findOneStoryBySlug } from '$lib/db/repositories/2-story-module';
 import { Language, MediaCollection } from '$lib/db/schemas/0-utils';
-import { getRoundedVideoTime, getYouTubeEmbedUrl } from '$lib/media/video';
 import { resolveAnimationConfig } from '$lib/media/animation';
+import { getRoundedVideoTime, getYouTubeEmbedUrl } from '$lib/media/video';
 import { cookieName, isLocale } from '$lib/paraglide/runtime';
 import { error } from '@sveltejs/kit';
 import type { PageServerLoad } from './$types';
@@ -48,7 +48,9 @@ export const load: PageServerLoad = async ({ cookies, locals, params }) => {
 			return {
 				id: part.id,
 				animation:
-					part.backgroundType === 'animation' && part.background && 'configuration' in part.background
+					part.backgroundType === 'animation' &&
+					part.background &&
+					'configuration' in part.background
 						? resolveAnimationConfig(part.background, language)
 						: undefined,
 				source:

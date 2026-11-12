@@ -28,7 +28,7 @@
 
 	const anthologyCardClass = (index: number) =>
 		cn(
-			'group relative min-h-0 overflow-hidden border-border/70 bg-card shadow-sm transition duration-300 hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-lg',
+			'group relative min-h-0 overflow-hidden border-border/70 bg-card shadow-sm transition duration-300 hover:-translate-y-0.5 hover:shadow-lg',
 			index % 7 === 0 && 'sm:col-span-2 md:col-span-1 xl:col-span-2',
 			index % 7 === 3 && 'md:col-span-2 xl:col-span-2',
 			index % 7 === 5 && 'sm:col-span-2 md:col-span-1 xl:col-span-1'
@@ -123,7 +123,7 @@
 							</Card.Title>
 							{#if anthology.description}
 								<Card.Description
-									class="prose prose-sm mt-2 line-clamp-2 max-w-none text-muted-foreground dark:prose-invert"
+									class="prose prose-sm mt-2 line-clamp-3 max-w-none text-muted-foreground dark:prose-invert"
 								>
 									<!-- eslint-disable-next-line svelte/no-at-html-tags -->
 									{@html anthology.description}

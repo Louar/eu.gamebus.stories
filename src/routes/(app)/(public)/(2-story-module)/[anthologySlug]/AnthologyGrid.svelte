@@ -276,7 +276,7 @@
 				{@const progress = getStoryProgress(story.id)}
 				{@const isCompleted = isStoryCompleted(story.id)}
 				<div
-					class="relative"
+					class="group relative rounded-xl transition duration-300 hover:-translate-y-0.5 hover:shadow-lg"
 					style:view-transition-name={transitioningStorySlug === story.slug && !isStoryDialogOpen
 						? 'selected-story-card'
 						: 'none'}
@@ -298,7 +298,7 @@
 
 					<Card.Root
 						class={cn(
-							'h-full overflow-hidden transition hover:-translate-y-0.5 hover:shadow-md has-[>.media:first-child]:pt-0',
+							'h-full overflow-hidden has-[>.media:first-child]:pt-0',
 							isCompleted &&
 								'border-emerald-200 bg-emerald-50/40 dark:border-emerald-900 dark:bg-emerald-950/20'
 						)}
@@ -310,7 +310,10 @@
 										src={thumbnail}
 										class="absolute inset-0 h-full w-full scale-110 object-cover opacity-55 blur-xl"
 									/>
-									<MediaFile src={thumbnail} class="relative h-full w-full object-contain" />
+									<MediaFile
+										src={thumbnail}
+										class="relative h-full w-full object-contain transition duration-500 group-hover:scale-[1.03]"
+									/>
 								</div>
 							{:else}
 								<div
@@ -332,19 +335,17 @@
 									</Card.Description>
 								</div>
 
-								<div
-									class="grid size-8 shrink-0 place-items-center rounded-full border bg-background shadow-sm dark:bg-muted"
-								>
-									{#if isCompleted}
-										<div
-											class="grid size-8 place-items-center rounded-full border-2 border-emerald-200 bg-emerald-400 text-emerald-50 shadow-sm ring-1 shadow-emerald-300 ring-emerald-300"
-										>
-											<FlagIcon class="size-4" />
-										</div>
-									{:else}
-										<ArrowUpRightIcon class="size-4 text-muted-foreground" />
-									{/if}
-								</div>
+								{#if isCompleted}
+									<div
+										class="grid size-8 shrink-0 place-items-center rounded-full border-2 border-emerald-200 bg-emerald-400 text-emerald-50 shadow-sm ring-1 shadow-emerald-300 ring-emerald-300"
+									>
+										<FlagIcon class="size-4" />
+									</div>
+								{:else}
+									<ArrowUpRightIcon
+										class="mt-0.5 size-4.5 shrink-0 text-muted-foreground/70 transition group-hover:translate-x-0.5 group-hover:-translate-y-0.5 group-hover:text-primary"
+									/>
+								{/if}
 							</div>
 						</Card.Header>
 					</Card.Root>

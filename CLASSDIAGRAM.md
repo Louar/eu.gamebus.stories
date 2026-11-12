@@ -187,7 +187,9 @@ classDiagram
   class AnthologyVisualization {
       <<enumeration>>
       GRID
+      GRID_WITH_EXPLANATION
       FEED
+      FEED_WITH_EXPLANATION
   }
 
   class PartBackgroundType {

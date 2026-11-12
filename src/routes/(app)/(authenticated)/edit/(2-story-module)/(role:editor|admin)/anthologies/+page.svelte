@@ -61,7 +61,9 @@
 	const filterFn = getFilterFn<Row>();
 	const visualizationOptions = () => [
 		{ title: 'Grid', value: AnthologyVisualization.grid },
-		{ title: 'Feed', value: AnthologyVisualization.feed }
+		{ title: 'Grid with explanation', value: AnthologyVisualization.gridWithExplanation },
+		{ title: 'Feed', value: AnthologyVisualization.feed },
+		{ title: 'Feed with explanation', value: AnthologyVisualization.feedWithExplanation }
 	];
 	const windowSize = useWindowSize({ defaultHeight: 800 });
 	const gridHeight = $derived(Math.max(250, windowSize.height - 150));

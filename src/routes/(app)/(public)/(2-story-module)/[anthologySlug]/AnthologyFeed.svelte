@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
 	import Story from '$lib/components/app/player/Story.svelte';
+	import { AnthologyVisualization } from '$lib/db/schemas/2-story-module';
+	import * as m from '$lib/paraglide/messages';
+	import { Streamdown } from 'streamdown-svelte';
 	import { PLAYERS } from '$lib/states/players.svelte';
 	import { STORIES } from '$lib/states/stories.svelte.js';
 	import ArrowDownIcon from '@lucide/svelte/icons/arrow-down';
@@ -27,7 +30,12 @@
 
 	let container: HTMLDivElement | null = null;
 
-	let active = $state(0);
+	let hasExplanation = $derived(
+		anthology.visualization === AnthologyVisualization.feedWithExplanation
+	);
+	// The parent keys the feed by anthology and visualization, so this is initial state only.
+	// svelte-ignore state_referenced_locally
+	let active = $state(hasExplanation ? -1 : 0);
 	let isScrolling = $state(false);
 	let io: IntersectionObserver | null = null;
 	let hasHydratedProgress = $state(false);
@@ -132,7 +140,7 @@
 			}))
 		);
 
-		const i = Math.max(0, Math.min(stories.length - 1 + 1, next));
+		const i = Math.max(hasExplanation ? -1 : 0, Math.min(stories.length, next));
 		active = i;
 		const playersOfNextStory = playersOfStories[active];
 
@@ -142,7 +150,7 @@
 			?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
 		await waitForScrollEnd(container);
-		if (playersOfNextStory) {
+		if (playersOfNextStory && active === i) {
 			storiesRestart[active] = false;
 
 			const initialPartOfNextStory = playersOfNextStory.find((p) => p.isInitialPart);
@@ -181,6 +189,8 @@
 	});
 
 	const onKeydown = (e: KeyboardEvent) => {
+		// Let the explanation scroll naturally, including with the keyboard.
+		if (active === -1) return;
 		if (e.key === 'ArrowDown') {
 			e.preventDefault();
 			scrollToIndex(active + 1);
@@ -291,7 +301,7 @@
 	});
 
 	$effect(() => {
-		if (active < stories.length) return;
+		if (active >= 0 && active < stories.length) return;
 		if (PLAYERS.isAnyOverlayActive) PLAYERS.isAnyOverlayActive = false;
 	});
 </script>
@@ -309,20 +319,53 @@
 		bind:this={container}
 		class="h-full w-full snap-y snap-mandatory scrollbar-none overflow-y-scroll overscroll-contain scroll-smooth"
 	>
+		{#if hasExplanation}
+			<section
+				data-index={-1}
+				class="relative h-full w-full snap-start snap-always bg-accent text-accent-foreground"
+			>
+				<div
+					class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.3),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.16),transparent)]"
+				></div>
+				<!-- The scrollable explanation must be keyboard focusable. -->
+				<!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+				<div
+					class="relative h-full overflow-y-auto px-6 pt-24 pr-24 pb-12 sm:px-12 sm:pr-28"
+					tabindex="0"
+					role="region"
+					aria-label={anthology.name ?? anthology.slug}
+				>
+					<div class="mx-auto flex min-h-full max-w-2xl flex-col justify-center gap-6">
+						<h1 class="text-3xl font-semibold tracking-tight wrap-anywhere sm:text-5xl">
+							{anthology.name ?? anthology.slug}
+						</h1>
+						{#if anthology.description}
+							<div
+								class="prose max-w-none wrap-anywhere text-accent-foreground/80 prose-headings:text-inherit prose-a:text-inherit prose-strong:text-inherit"
+							>
+								<Streamdown content={anthology.description} mode="static" />
+							</div>
+						{/if}
+					</div>
+				</div>
+			</section>
+		{/if}
 		{#each stories as story, i (i)}
 			<section data-index={i} class="relative h-full w-full snap-start snap-always">
-				<Story
-					{story}
-					players={playersOfStories[i]}
-					isActiveStory={active === i}
-					onnext={async () => {
-						if (stories.length - 1 + 1 > i) {
-							await new Promise((r) => setTimeout(r, 1000));
-							scrollToIndex(i + 1);
-						}
-					}}
-					doRestart={storiesRestart[i]}
-				/>
+				{#if active >= 0}
+					<Story
+						{story}
+						players={playersOfStories[i]}
+						isActiveStory={active === i}
+						onnext={async () => {
+							if (stories.length - 1 + 1 > i) {
+								await new Promise((r) => setTimeout(r, 1000));
+								if (active === i) scrollToIndex(i + 1);
+							}
+						}}
+						doRestart={storiesRestart[i]}
+					/>
+				{/if}
 			</section>
 		{/each}
 		<section data-index={stories.length} class="relative h-full w-full snap-start snap-always">
@@ -356,21 +399,25 @@
 	</div>
 
 	<!-- Static overlay -->
-	<div class="pointer-events-none absolute inset-0 z-40">
-		<div class="absolute inset-x-0 top-0 h-28 bg-linear-to-b from-black/60 to-transparent"></div>
-		<div class="absolute inset-x-0 bottom-0 h-44 bg-linear-to-t from-black/70 to-transparent"></div>
+	{#if active >= 0}
+		<div class="pointer-events-none absolute inset-0 z-40">
+			<div class="absolute inset-x-0 top-0 h-28 bg-linear-to-b from-black/60 to-transparent"></div>
+			<div
+				class="absolute inset-x-0 bottom-0 h-44 bg-linear-to-t from-black/70 to-transparent"
+			></div>
 
-		<!-- Meta information -->
-		{#if showMetaInfo}
-			<div transition:fade={{ duration: 150 }} class="absolute right-16 bottom-10 left-4">
-				<!-- <div class="text-sm opacity-90">###</div> -->
-				<div class="mt-1 line-clamp-2 text-lg leading-snug font-semibold md:line-clamp-1">
-					{stories[active]?.name}
+			<!-- Meta information -->
+			{#if showMetaInfo}
+				<div transition:fade={{ duration: 150 }} class="absolute right-16 bottom-10 left-4">
+					<!-- <div class="text-sm opacity-90">###</div> -->
+					<div class="mt-1 line-clamp-2 text-lg leading-snug font-semibold md:line-clamp-1">
+						{stories[active]?.name}
+					</div>
+					<!-- <div class="mt-1 text-sm opacity-80">#demo #svelte5 #tailwind</div> -->
 				</div>
-				<!-- <div class="mt-1 text-sm opacity-80">#demo #svelte5 #tailwind</div> -->
-			</div>
-		{/if}
-	</div>
+			{/if}
+		</div>
+	{/if}
 
 	<!-- Navigation actions -->
 	{#if !PLAYERS.isAnyOverlayActive}
@@ -387,6 +434,8 @@
 				{/if}
 				<button
 					type="button"
+					aria-label={m.story_grid_previous_story()}
+					disabled={hasExplanation && active === -1}
 					class="grid h-12 w-12 place-items-center rounded-full bg-white/10 backdrop-blur"
 					onclick={() => scrollToIndex(active - 1)}
 				>
@@ -394,6 +443,7 @@
 				</button>
 				<button
 					type="button"
+					aria-label="Next slide"
 					class="grid h-12 w-12 place-items-center rounded-full bg-white/10 backdrop-blur"
 					onclick={() => scrollToIndex(active + 1)}
 				>
@@ -404,7 +454,7 @@
 	{/if}
 
 	<!-- Active indicator -->
-	{#if active < stories.length}
+	{#if active >= 0 && active < stories.length}
 		<div
 			transition:fade={{ duration: 150 }}
 			class="pointer-events-none absolute top-4 left-4 z-50 rounded-full bg-white/10 px-3 py-1 text-xs backdrop-blur"

@@ -11,6 +11,8 @@
 	import * as Dialog from '$lib/components/ui/dialog';
 	import { MediaFile } from '$lib/components/ui/media-file';
 	import type { Media } from '$lib/db/schemas/0-utils';
+	import { AnthologyVisualization } from '$lib/db/schemas/2-story-module';
+	import { Streamdown } from 'streamdown-svelte';
 	import * as m from '$lib/paraglide/messages';
 	import { STORIES } from '$lib/states/stories.svelte.js';
 	import { cn } from '$lib/utils';
@@ -244,32 +246,25 @@
 
 <main class="min-h-dvh bg-background text-foreground">
 	<div class="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
-		<!-- <div
-			class="grid gap-6 overflow-hidden rounded-2xl border bg-card shadow-sm md:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]"
-		>
-			<div class="flex flex-col justify-center gap-3 p-6 sm:p-8">
-				<p class="text-sm font-medium tracking-wide text-muted-foreground uppercase">Anthology</p>
-				<h2 class="text-3xl font-semibold tracking-tight sm:text-4xl">
-					{anthology.name ?? anthology.slug}
-				</h2>
-				{#if anthology.description}
-					<p class="max-w-2xl text-base leading-7 text-muted-foreground">
-						{anthology.description}
-					</p>
-				{/if}
-			</div>
-			<div class="min-h-56 bg-muted md:min-h-0">
-				{#if anthology.thumbnail}
-					<MediaFile src={anthology.thumbnail} class="h-full w-full object-cover" />
-				{:else}
-					<div
-						class="grid h-full min-h-56 place-items-center bg-linear-to-br from-muted to-muted/40 text-sm font-medium text-muted-foreground"
-					>
-						{stories.length} stories
-					</div>
-				{/if}
-			</div>
-		</div> -->
+		{#if anthology.visualization === AnthologyVisualization.gridWithExplanation}
+			<Card.Root class="relative overflow-hidden border-accent/20 bg-accent text-accent-foreground">
+				<div
+					class="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.3),transparent_42%),linear-gradient(135deg,rgba(255,255,255,0.16),transparent)]"
+				></div>
+				<Card.Header class="relative gap-4 p-6 sm:p-8">
+					<h2 class="text-2xl font-semibold tracking-tight wrap-anywhere sm:text-3xl">
+						{anthology.name ?? anthology.slug}
+					</h2>
+					{#if anthology.description}
+						<div
+							class="prose prose-sm max-w-2xl wrap-anywhere text-accent-foreground/75 prose-headings:text-inherit prose-a:text-inherit prose-strong:text-inherit"
+						>
+							<Streamdown content={anthology.description} mode="static" />
+						</div>
+					{/if}
+				</Card.Header>
+			</Card.Root>
+		{/if}
 		<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 			{#each stories as story, i (story.id)}
 				{@const thumbnail = getStoryThumbnail(story)}

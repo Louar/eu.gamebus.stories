@@ -17,7 +17,9 @@ export type AnthologyPermissionRole =
 
 export const AnthologyVisualization = {
 	grid: 'GRID',
-	feed: 'FEED'
+	gridWithExplanation: 'GRID_WITH_EXPLANATION',
+	feed: 'FEED',
+	feedWithExplanation: 'FEED_WITH_EXPLANATION'
 } as const;
 export type AnthologyVisualization =
 	(typeof AnthologyVisualization)[keyof typeof AnthologyVisualization];

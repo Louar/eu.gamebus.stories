@@ -9,8 +9,10 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
-{#if data.anthology.visualization === AnthologyVisualization.feed}
-	<AnthologyFeed {data} />
+{#if data.anthology.visualization === AnthologyVisualization.feed || data.anthology.visualization === AnthologyVisualization.feedWithExplanation}
+	{#key `${data.anthology.id}:${data.anthology.visualization}`}
+		<AnthologyFeed {data} />
+	{/key}
 	<a
 		href={resolve('/')}
 		class="fixed top-4 left-20 z-50 inline-flex size-12 items-center justify-center rounded-full bg-black/45 text-white shadow-sm backdrop-blur transition hover:bg-black/60 focus-visible:ring-2 focus-visible:ring-white focus-visible:outline-hidden"

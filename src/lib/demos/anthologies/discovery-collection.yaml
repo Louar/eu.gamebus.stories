@@ -1,0 +1,1385 @@
+slug: discovery-collection
+name:
+  en: Discovery Collection
+  nl: Ontdekkingscollectie
+thumbnail:
+  default:
+    collection: externals
+    filename: https://assets.evolyn.club/videos/play-pause.jpg
+description:
+  en: An ordered anthology containing Quiz of Cities, Trail Decisions, and World Food Expedition with their taxonomy dependencies and a performance overview.
+  nl: Een geordende anthologie met Stedenquiz, Trail Decisions en World Food Expedition met hun taxonomie-afhankelijkheden en een prestatieoverzicht.
+visualization: GRID
+configuration:
+  showPerformanceOverview: true
+isPublished: true
+isPublic: true
+positions:
+  - order: 1
+    storySlug: quiz-of-cities
+    configuration: null
+  - order: 2
+    storySlug: trail-decisions
+    configuration: null
+  - order: 3
+    storySlug: world-food-expedition
+    configuration: null
+stories:
+  - slug: quiz-of-cities
+    name:
+      en: Quiz of Cities
+      nl: Stedenquiz
+    configuration: null
+    isPublished: true
+    isPublic: true
+    videos:
+      - id: video-1
+        name: Play/Pause
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/play-pause/stream.m3u8
+        thumbnail:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/play-pause.jpg
+        captions: null
+        duration: 15
+      - id: video-2
+        name: Countdown
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/countdown/stream.m3u8
+        thumbnail:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/countdown.jpg
+        captions: null
+        duration: 10
+      - id: video-3
+        name: City of Barcelona
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/city-Barcelona/stream.m3u8
+        thumbnail: null
+        captions: null
+        duration: 5
+      - id: video-4
+        name: Thumbs-down
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/thumbs-down/stream.m3u8
+        thumbnail: null
+        captions: null
+        duration: 9
+      - id: video-5
+        name: Thumbs-up
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/thumbs-up/stream.m3u8
+        thumbnail: null
+        captions: null
+        duration: 5
+      - id: video-6
+        name: City of Luzern
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/city-Luzern/stream.m3u8
+        thumbnail: null
+        captions: null
+        duration: 5
+      - id: video-7
+        name: Game over
+        source:
+          default:
+            collection: externals
+            filename: https://assets.evolyn.club/videos/game-over/stream.m3u8
+        thumbnail: null
+        captions: null
+        duration: 10
+    announcements:
+      - id: announcementTemplate-1
+        name: Welcome to quiz
+        title:
+          en: Welcome to the quiz!
+        message:
+          en: And good luck!
+    quizzes:
+      - id: quizTemplate-1
+        name: Are you ready?-quiz
+        doRandomize: false
+        questions:
+          - id: quizQuestionTemplate-1
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: Are you ready?
+            instruction: null
+            placeholder: null
+            configuration: null
+            isRequired: true
+            answerGroup:
+              id: quizQuestionTemplateAnswerGroup-1
+              doRandomize: true
+            answerOptions:
+              - id: quizQuestionTemplateAnswerItem-1
+                order: 1
+                value: 1
+                label:
+                  en: Yes
+              - id: quizQuestionTemplateAnswerItem-2
+                order: 2
+                value: 0
+                label:
+                  en: No
+          - id: quizQuestionTemplate-2
+            order: 2
+            answerTemplateSlug: select-single
+            title:
+              en: Are you sure?
+            instruction: null
+            placeholder: null
+            configuration: null
+            isRequired: true
+            answerGroup:
+              id: quizQuestionTemplateAnswerGroup-2
+              doRandomize: false
+            answerOptions:
+              - id: quizQuestionTemplateAnswerItem-3
+                order: 1
+                value: YES
+                label:
+                  en: Yes
+              - id: quizQuestionTemplateAnswerItem-4
+                order: 2
+                value: NO
+                label:
+                  en: No
+      - id: quizTemplate-2
+        name: City of Barcelona quiz
+        doRandomize: false
+        questions:
+          - id: quizQuestionTemplate-3
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: Which city is this?
+            instruction: null
+            placeholder: null
+            configuration: null
+            isRequired: true
+            answerGroup:
+              id: quizQuestionTemplateAnswerGroup-3
+              doRandomize: false
+            answerOptions:
+              - id: quizQuestionTemplateAnswerItem-5
+                order: 1
+                value: Barcelona
+                label:
+                  en: Barcelona
+              - id: quizQuestionTemplateAnswerItem-6
+                order: 2
+                value: Amsterdam
+                label:
+                  en: Amsterdam
+              - id: quizQuestionTemplateAnswerItem-7
+                order: 3
+                value: Malaga
+                label:
+                  en: Malaga
+              - id: quizQuestionTemplateAnswerItem-8
+                order: 4
+                value: Bari
+                label:
+                  en: Bari
+      - id: quizTemplate-3
+        name: City of Luzern quiz
+        doRandomize: false
+        questions:
+          - id: quizQuestionTemplate-4
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: Which city is this?
+            instruction: null
+            placeholder: null
+            configuration: null
+            isRequired: true
+            answerGroup:
+              id: quizQuestionTemplateAnswerGroup-4
+              doRandomize: false
+            answerOptions:
+              - id: quizQuestionTemplateAnswerItem-9
+                order: 1
+                value: Luzern
+                label:
+                  en: Luzern
+              - id: quizQuestionTemplateAnswerItem-10
+                order: 2
+                value: Munich
+                label:
+                  en: Munich
+              - id: quizQuestionTemplateAnswerItem-11
+                order: 3
+                value: Berlin
+                label:
+                  en: Berlin
+              - id: quizQuestionTemplateAnswerItem-12
+                order: 4
+                value: Zurich
+                label:
+                  en: Zurich
+      - id: quizTemplate-4
+        name: Game over quiz
+        doRandomize: false
+        questions: []
+    parts:
+      - id: part-1
+        position:
+          x: 0
+          y: 0
+        backgroundType: video
+        backgroundConfiguration:
+          start: 0.05
+          end: 0.45
+        foregroundType: quiz
+        foregroundConfiguration:
+          start: 0.15
+        videoId: video-1
+        announcementTemplateId: null
+        defaultNextPartId: null
+        quizLogicForPartId: quizLogicForPart-1
+        taxonomyDraftForPartId: null
+        isInitial: true
+        terminationStrategy: NONE
+        quizTemplateId: quizTemplate-1
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: quizTemplate-1
+          defaultNextPartId: part-1
+          rules:
+            - id: quizLogicRule-1
+              order: 1
+              name: Is ready
+              nextPartId: part-2
+              inputs:
+                - quizQuestionTemplateId: quizQuestionTemplate-1
+                  quizQuestionTemplateAnswerItemId: quizQuestionTemplateAnswerItem-1
+                  value: null
+                - quizQuestionTemplateId: quizQuestionTemplate-2
+                  quizQuestionTemplateAnswerItemId: quizQuestionTemplateAnswerItem-3
+                  value: null
+      - id: part-2
+        position:
+          x: 400
+          y: -200
+        backgroundType: video
+        backgroundConfiguration:
+          start: 0.5
+        foregroundType: announcement
+        foregroundConfiguration:
+          start: 0.75
+        videoId: video-2
+        announcementTemplateId: announcementTemplate-1
+        defaultNextPartId: part-3
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: null
+        quizLogicForPart: null
+      - id: part-3
+        position:
+          x: 800
+          y: 0
+        backgroundType: video
+        backgroundConfiguration: null
+        foregroundType: quiz
+        foregroundConfiguration:
+          start: 1
+        videoId: video-3
+        announcementTemplateId: null
+        defaultNextPartId: null
+        quizLogicForPartId: quizLogicForPart-2
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: quizTemplate-2
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: quizTemplate-2
+          defaultNextPartId: part-4
+          rules:
+            - id: quizLogicRule-2
+              order: 1
+              name: 'Correct: Barcelona'
+              nextPartId: part-5
+              inputs:
+                - quizQuestionTemplateId: quizQuestionTemplate-3
+                  quizQuestionTemplateAnswerItemId: quizQuestionTemplateAnswerItem-5
+                  value: null
+      - id: part-4
+        position:
+          x: 1200
+          y: 200
+        backgroundType: video
+        backgroundConfiguration:
+          end: 0.5
+        foregroundType: null
+        foregroundConfiguration: null
+        videoId: video-4
+        announcementTemplateId: null
+        defaultNextPartId: part-3
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: null
+        quizLogicForPart: null
+      - id: part-5
+        position:
+          x: 1200
+          y: -200
+        backgroundType: video
+        backgroundConfiguration:
+          end: 1
+        foregroundType: null
+        foregroundConfiguration: null
+        videoId: video-5
+        announcementTemplateId: null
+        defaultNextPartId: part-6
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: null
+        quizLogicForPart: null
+      - id: part-6
+        position:
+          x: 1600
+          y: 0
+        backgroundType: video
+        backgroundConfiguration: null
+        foregroundType: quiz
+        foregroundConfiguration:
+          start: 1
+        videoId: video-6
+        announcementTemplateId: null
+        defaultNextPartId: null
+        quizLogicForPartId: quizLogicForPart-3
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: quizTemplate-3
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: quizTemplate-3
+          defaultNextPartId: part-7
+          rules:
+            - id: quizLogicRule-3
+              order: 1
+              name: 'Correct: Luzern'
+              nextPartId: part-8
+              inputs:
+                - quizQuestionTemplateId: quizQuestionTemplate-4
+                  quizQuestionTemplateAnswerItemId: quizQuestionTemplateAnswerItem-9
+                  value: null
+      - id: part-7
+        position:
+          x: 2000
+          y: 200
+        backgroundType: video
+        backgroundConfiguration:
+          end: 0.4
+        foregroundType: null
+        foregroundConfiguration: null
+        videoId: video-4
+        announcementTemplateId: null
+        defaultNextPartId: part-6
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: FAIL_STORY
+        quizTemplateId: null
+        quizLogicForPart: null
+      - id: part-8
+        position:
+          x: 2000
+          y: -200
+        backgroundType: video
+        backgroundConfiguration:
+          end: 0.8
+        foregroundType: null
+        foregroundConfiguration: null
+        videoId: video-5
+        announcementTemplateId: null
+        defaultNextPartId: part-9
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: NONE
+        quizTemplateId: null
+        quizLogicForPart: null
+      - id: part-9
+        position:
+          x: 2400
+          y: 0
+        backgroundType: video
+        backgroundConfiguration: null
+        foregroundType: null
+        foregroundConfiguration: null
+        videoId: video-7
+        announcementTemplateId: null
+        defaultNextPartId: null
+        quizLogicForPartId: null
+        taxonomyDraftForPartId: null
+        isInitial: false
+        terminationStrategy: COMPLETE_STORY
+        quizTemplateId: null
+        quizLogicForPart: null
+  - slug: trail-decisions
+    name:
+      en: Trail Decisions
+      nl: Keuzes op het wandelpad
+    isPublished: true
+    isPublic: true
+    defaultBackgroundColor: '#10251f'
+    configuration: null
+    videos: []
+    stills:
+      - id: forest
+        color: '#10251f'
+        image: null
+        style: null
+      - id: shelter
+        color: '#182934'
+        image: null
+        style: null
+      - id: silence
+        color: '#131b22'
+        image: null
+        style: null
+    animations:
+      - id: storm-motion
+        name: Rain at the ridge
+        texts: null
+        configuration:
+          version: 1
+          composition:
+            viewBoxWidth: 1280
+            viewBoxHeight: 720
+            fps: 30
+            durationInFrames: 150
+            background: '#10251f'
+          playback:
+            autoplay: true
+            loop: false
+          layers:
+            - type: ellipse
+              name: Low cloud at the edge
+              props:
+                x: 1100
+                y: 90
+                radiusX: 240
+                radiusY: 95
+                fill: '#647d87'
+                opacity: 0.12
+              animate:
+                x: [1100, 1020]
+            - type: line
+              name: Rain on the left
+              props:
+                x: 90
+                y: 80
+                x1: 0
+                y1: 0
+                x2: -35
+                y2: 170
+                stroke: '#789aab'
+                lineWidth: 2
+                opacity: 0.25
+              animate:
+                y: [80, 430]
+            - type: line
+              name: Rain on the right
+              props:
+                x: 1190
+                y: 260
+                x1: 0
+                y1: 0
+                x2: -35
+                y2: 170
+                stroke: '#789aab'
+                lineWidth: 2
+                opacity: 0.2
+              animate:
+                y: [260, 610]
+      - id: rescue-motion
+        name: Lanterns through the trees
+        texts: null
+        configuration:
+          version: 1
+          composition:
+            viewBoxWidth: 1280
+            viewBoxHeight: 720
+            fps: 30
+            durationInFrames: 540
+            background: '#182934'
+          playback:
+            autoplay: true
+            loop: false
+          layers:
+            - type: circle
+              name: First lantern
+              props:
+                x: 80
+                y: 590
+                radius: 95
+                fill: '#d6b878'
+                opacity: 0.08
+              animate:
+                x: [80, 160]
+                opacity: [0.08, 0.22]
+            - type: circle
+              name: Second lantern
+              props:
+                x: 1210
+                y: 120
+                radius: 70
+                fill: '#d6b878'
+                opacity: 0.06
+              animate:
+                x: [1210, 1130]
+                opacity: [0.06, 0.18]
+    announcements:
+      - id: welcome
+        name: Rowan makes contact
+        title:
+          en: 'ROWAN / 12% battery'
+          nl: 'ROWAN / 12% batterij'
+        message:
+          en: >-
+            Hello? The trail app says you're my emergency contact. Excellent. We've skipped the awkward introductions.
+            I'm Rowan. Alone in Blackpine Forest, ankle swollen, bridge washed out behind me.
+            My emergency call dropped, but these messages go through. Please stay. It's getting dark.
+          nl: >-
+            Hallo? Volgens de wandelapp ben jij mijn noodcontact. Mooi. Slaan we het ongemakkelijke voorstellen over.
+            Ik ben Rowan. Alleen in het Zwartdennenbos, dikke enkel, brug achter me weggespoeld.
+            Mijn noodoproep viel weg, maar deze berichten komen door. Blijf alsjeblieft. Het wordt donker.
+      - id: road-busy
+        name: Rowan follows the service road
+        title:
+          en: Rowan is busy / walking
+          nl: Rowan is bezig / onderweg
+        message:
+          en: 'Taking the service road. One careful step at a time. My ankle has filed a formal complaint.'
+          nl: 'Ik neem de dienstweg. Voorzichtig, stap voor stap. Mijn enkel heeft officieel bezwaar ingediend.'
+      - id: ridge-busy
+        name: Rowan attempts the ridge
+        title:
+          en: Rowan is busy / climbing
+          nl: Rowan is bezig / klimmen
+        message:
+          en: 'Trying the ridge. Rain in my eyes. The trail just slid under my bad foot. Wait. Where is the marker?'
+          nl: 'Ik probeer de kam. Regen in mijn ogen. Het pad gleed net onder mijn slechte voet weg. Wacht. Waar is de markering?'
+      - id: call-busy
+        name: Rowan contacts rescue
+        title:
+          en: Rowan is busy / calling for help
+          nl: Rowan is bezig / hulp bellen
+        message:
+          en: 'Calling again from the doorway. Reading them the pump-house number. Please let someone pick up.'
+          nl: 'Ik bel opnieuw vanuit de deuropening. Ik lees het nummer van het pomphuis voor. Neem alsjeblieft op.'
+      - id: rescue-busy
+        name: Rowan waits for the team
+        title:
+          en: Rowan is busy / signalling
+          nl: Rowan is bezig / signaleren
+        message:
+          en: 'Staying put. Whistle, listen, repeat. Someone just whistled back. Please be a person, not a very talented owl.'
+          nl: 'Ik blijf hier. Fluiten, luisteren, herhalen. Er fluit iemand terug. Hopelijk een mens, geen bijzonder getalenteerde uil.'
+      - id: lost
+        name: The connection is lost
+        title:
+          en: 'ROWAN / message interrupted'
+          nl: 'ROWAN / bericht onderbroken'
+        message:
+          en: >-
+            I shouldn't have left the marked route. Can't find my way back in this rain.
+            My ankle won't hold. Phone hit the water when I fell. If this sends, I'm near the...
+            [No further messages. Rowan's location is unknown.]
+          nl: >-
+            Ik had de gemarkeerde route niet moeten verlaten. Ik vind de weg terug niet in deze regen.
+            Mijn enkel houdt het niet. Telefoon viel in het water toen ik viel. Als dit aankomt, ik ben bij de...
+            [Geen nieuwe berichten. Rowans locatie is onbekend.]
+      - id: goodbye
+        name: End this attempt
+        title:
+          en: Connection closed
+          nl: Verbinding gesloten
+        message:
+          en: 'This attempt ends here. Rowan was not located before the connection failed. No rescue is confirmed.'
+          nl: 'Deze poging eindigt hier. Rowan was nog niet gevonden toen de verbinding wegviel. Er is geen redding bevestigd.'
+      - id: rescued
+        name: Rowan is rescued
+        title:
+          en: 'ROWAN / borrowing a phone'
+          nl: 'ROWAN / geleende telefoon'
+        message:
+          en: >-
+            They found the pump house. Found me. I'm in the rescue van, wrapped in enough foil to qualify as a baked potato.
+            You kept me somewhere they could find. Thank you for staying.
+            When my ankle works again: a walk? Somewhere dangerous. Like a bakery.
+          nl: >-
+            Ze vonden het pomphuis. En mij. Ik zit in de reddingswagen, in genoeg folie om door te gaan voor een gepofte aardappel.
+            Dankzij jou bleef ik op een plek waar ze me konden vinden. Bedankt dat je bleef.
+            Als mijn enkel weer werkt: wandelen? Ergens gevaarlijks. Een bakkerij of zo.
+    quizzes:
+      - id: route
+        name: Choose a route
+        doRandomize: false
+        questions:
+          - id: route-question
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: 'ROWAN: Sign says pump house along the service road. Ridge might have better reception. Thunder up there. Your call?'
+              nl: 'ROWAN: Bord wijst naar een pomphuis langs de dienstweg. Op de kam misschien beter bereik. Wel onweer. Wat denk jij?'
+            instruction:
+              en: 'Fictional chat: busy scenes are compressed into a few seconds. Take your time choosing a reply.'
+              nl: 'Fictieve chat: bezige momenten duren hier maar een paar seconden. Neem de tijd voor je antwoord.'
+            isRequired: true
+            answerGroup:
+              doRandomize: false
+            answerOptions:
+              - id: service-road-answer
+                order: 1
+                value: service-road
+                label:
+                  en: Take the marked service road. Give that ankle a chance.
+                  nl: Neem de gemarkeerde dienstweg. Spaar die enkel.
+              - id: ridge-answer
+                order: 2
+                value: ridge
+                label:
+                  en: Try the ridge. We need a stronger signal.
+                  nl: Probeer de kam. We hebben beter bereik nodig.
+      - id: shelter-plan
+        name: Use the landmark
+        doRandomize: false
+        questions:
+          - id: shelter-question
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: 'ROWAN: Made it. Brick pump house, sign P-17, dry doorway. Five-star accommodation if you like spiders. Call again, or look for the road beyond the trees?'
+              nl: 'ROWAN: Ik ben er. Bakstenen pomphuis, bord P-17, droge deuropening. Vijf sterren als je van spinnen houdt. Weer bellen, of achter de bomen naar de weg zoeken?'
+            isRequired: true
+            answerGroup:
+              doRandomize: false
+            answerOptions:
+              - id: call-answer
+                order: 1
+                value: call
+                label:
+                  en: Call emergency services. Tell them P-17 and stay there.
+                  nl: Bel de hulpdiensten. Geef P-17 door en blijf daar.
+              - id: search-answer
+                order: 2
+                value: search
+                label:
+                  en: Look for the road. You might flag down a car.
+                  nl: Zoek de weg. Misschien kun je een auto aanhouden.
+      - id: signal-plan
+        name: Help rescuers find Rowan
+        doRandomize: false
+        questions:
+          - id: signal-question
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: 'ROWAN: They answered! Team coming to P-17. Told me to stay. Now there are lights beyond the trees, moving away. I have a whistle. Follow them or make some noise?'
+              nl: 'ROWAN: Ze namen op! Er komt een team naar P-17. Ik moet hier blijven. Nu zie ik licht achter de bomen, het gaat verder weg. Ik heb een fluitje. Eropaf of geluid maken?'
+            isRequired: true
+            answerGroup:
+              doRandomize: false
+            answerOptions:
+              - id: follow-answer
+                order: 1
+                value: follow
+                label:
+                  en: Follow the lights before you lose them.
+                  nl: Volg het licht voordat het verdwijnt.
+              - id: whistle-answer
+                order: 2
+                value: whistle
+                label:
+                  en: Stay at P-17. Use the whistle to bring them to you.
+                  nl: Blijf bij P-17. Laat ze met je fluitje naar jou komen.
+      - id: retry
+        name: Rewind the story
+        doRandomize: false
+        questions:
+          - id: retry-question
+            order: 1
+            answerTemplateSlug: select-single
+            title:
+              en: 'The chat has gone silent. Rewind this fictional story to Rowan at the junction, before any route was chosen?'
+              nl: 'De chat is stilgevallen. Dit fictieve verhaal terugspoelen naar Rowan bij de splitsing, voordat je een route koos?'
+            isRequired: true
+            answerGroup:
+              doRandomize: false
+            answerOptions:
+              - id: rewind-answer
+                order: 1
+                value: rewind
+                label:
+                  en: Rewind to the junction. Let's choose differently.
+                  nl: Terug naar de splitsing. We kiezen anders.
+              - id: end-answer
+                order: 2
+                value: end
+                label:
+                  en: End this attempt here.
+                  nl: Stop deze poging hier.
+    parts:
+      - id: introduction
+        isInitial: true
+        terminationStrategy: NONE
+        position: { x: 0, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 22 }
+        stillId: forest
+        videoId: null
+        defaultNextPartId: junction
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: welcome
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: junction
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 400, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: null
+        stillId: forest
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: quiz
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: route
+        quizLogicForPartId: route-logic
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: route
+          defaultNextPartId: climbing-ridge
+          rules:
+            - order: 1
+              name: Stay on the service road
+              nextPartId: walking-road
+              inputs:
+                - quizQuestionTemplateId: route-question
+                  quizQuestionTemplateAnswerItemId: service-road-answer
+        taxonomyDraftForPartId: null
+      - id: walking-road
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 800, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 6 }
+        stillId: forest
+        videoId: null
+        defaultNextPartId: pump-house
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: road-busy
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: climbing-ridge
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 800, y: 400 }
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: storm-motion
+        videoId: null
+        defaultNextPartId: signal-lost
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: ridge-busy
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: pump-house
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 1200, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: null
+        stillId: shelter
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: quiz
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: shelter-plan
+        quizLogicForPartId: shelter-logic
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: shelter-plan
+          defaultNextPartId: signal-lost
+          rules:
+            - order: 1
+              name: Report the pump-house number
+              nextPartId: contacting-rescue
+              inputs:
+                - quizQuestionTemplateId: shelter-question
+                  quizQuestionTemplateAnswerItemId: call-answer
+        taxonomyDraftForPartId: null
+      - id: contacting-rescue
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 1600, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 5 }
+        stillId: shelter
+        videoId: null
+        defaultNextPartId: rescue-signal
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: call-busy
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: rescue-signal
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 2000, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: null
+        stillId: shelter
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: quiz
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: signal-plan
+        quizLogicForPartId: signal-logic
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: signal-plan
+          defaultNextPartId: signal-lost
+          rules:
+            - order: 1
+              name: Signal from the known location
+              nextPartId: waiting-rescue
+              inputs:
+                - quizQuestionTemplateId: signal-question
+                  quizQuestionTemplateAnswerItemId: whistle-answer
+        taxonomyDraftForPartId: null
+      - id: waiting-rescue
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 2400, y: 0 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 6 }
+        stillId: shelter
+        videoId: null
+        defaultNextPartId: safe-arrival
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: rescue-busy
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: safe-arrival
+        isInitial: false
+        terminationStrategy: COMPLETE_STORY
+        position: { x: 2800, y: 0 }
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: rescue-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: rescued
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: signal-lost
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 1600, y: 400 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 16 }
+        stillId: silence
+        videoId: null
+        defaultNextPartId: rewind
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: lost
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+      - id: rewind
+        isInitial: false
+        terminationStrategy: NONE
+        position: { x: 2000, y: 400 }
+        backgroundType: still
+        backgroundConfiguration: null
+        stillId: silence
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: quiz
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: retry
+        quizLogicForPartId: retry-logic
+        quizLogicForPart:
+          hitpolicy: first
+          quizTemplateId: retry
+          defaultNextPartId: connection-ended
+          rules:
+            - order: 1
+              name: Rewind to the first decision
+              nextPartId: junction
+              inputs:
+                - quizQuestionTemplateId: retry-question
+                  quizQuestionTemplateAnswerItemId: rewind-answer
+        taxonomyDraftForPartId: null
+      - id: connection-ended
+        isInitial: false
+        terminationStrategy: FAIL_STORY
+        position: { x: 2400, y: 400 }
+        backgroundType: still
+        backgroundConfiguration: { duration: 10 }
+        stillId: silence
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: goodbye
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+  - slug: world-food-expedition
+    name:
+      en: World Food Expedition
+      nl: Wereldvoedselexpeditie
+    isPublished: true
+    isPublic: true
+    defaultBackgroundColor: '#101b2b'
+    configuration: null
+    videos: []
+    quizzes: []
+    animations:
+      - id: atlas-motion
+        name: Atlas orbit
+        texts: null
+        configuration:
+          version: 1
+          composition:
+            viewBoxWidth: 1280
+            viewBoxHeight: 720
+            fps: 30
+            durationInFrames: 360
+            background: '#101b2b'
+          playback:
+            autoplay: true
+            loop: true
+          layers:
+            - type: circle
+              props:
+                x: 180
+                y: 130
+                radius: 180
+                fill: '#193c53'
+                opacity: 0.6
+              animate:
+                x: [180, 300, 180]
+                y: [130, 220, 130]
+            - type: circle
+              props:
+                x: 1120
+                y: 640
+                radius: 240
+                stroke: '#327f8a'
+                lineWidth: 2
+                opacity: 0.5
+              animate:
+                scale: [1, 1.2, 1]
+                rotation: [0, 180, 360]
+      - id: garden-motion
+        name: Garden drift
+        texts: null
+        configuration:
+          version: 1
+          composition:
+            viewBoxWidth: 1280
+            viewBoxHeight: 720
+            fps: 30
+            durationInFrames: 300
+            background: '#14271f'
+          playback:
+            autoplay: true
+            loop: true
+          layers:
+            - type: ellipse
+              props:
+                x: 100
+                y: 600
+                radiusX: 250
+                radiusY: 140
+                fill: '#286149'
+                opacity: 0.5
+              animate:
+                rotation: [-15, 15, -15]
+                x: [100, 170, 100]
+            - type: circle
+              props:
+                x: 1200
+                y: 80
+                radius: 190
+                fill: '#8b7534'
+                opacity: 0.25
+              animate:
+                y: [80, 160, 80]
+                scale: [1, 1.15, 1]
+    announcements:
+      - id: welcome
+        name: Expedition briefing
+        title:
+          en: From the atlas to your plate
+          nl: Van de atlas naar je bord
+        message:
+          en:
+            Explore five challenges using real taxonomy data. Locate countries, compare populations, trace
+            food origins, compare nutrition, and classify foods on the Wheel of Five. Each stage has
+            five rounds; three correct answers unlock the next stage.
+          nl:
+            Ontdek vijf uitdagingen met taxonomiegegevens. Vind landen, vergelijk bevolkingen, ontdek de
+            herkomst en voedingswaarde van voedsel en oefen met de Schijf van Vijf. Drie goede
+            antwoorden openen de volgende fase.
+      - id: retry
+        name: Field notes
+        title:
+          en: Keep exploring
+          nl: Blijf ontdekken
+        message:
+          en: You did not reach three correct rounds in this stage. Review the answers and start the
+            expedition again. The next draft will bring a fresh selection.
+          nl:
+            Je behaalde geen drie goede rondes in deze fase. Bekijk de antwoorden en begin opnieuw met een
+            nieuwe selectie.
+      - id: complete
+        name: Expedition complete
+        title:
+          en: Expedition complete
+          nl: Expeditie voltooid
+        message:
+          en:
+            You connected geography, food origins, nutrition, and food groups. These demo values are
+            educational examples, not dietary advice; food origins are representative associations.
+          nl:
+            Je hebt geografie, herkomst, voedingswaarden en voedselgroepen verkend. Deze demogegevens zijn
+            educatieve voorbeelden, geen voedingsadvies.
+    parts:
+      - id: briefing
+        isInitial: true
+        terminationStrategy: NONE
+        position:
+          x: 0
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: atlas-motion
+        videoId: null
+        defaultNextPartId: locate-countries
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: welcome
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+        taxonomyDraftForPart: null
+      - id: locate-countries
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 400
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: atlas-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: taxonomy
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: locate-draft
+        taxonomyDraftForPart:
+          taxonomySlug: countries-and-foods
+          nrOfRounds: 5
+          nrOfItemsPerRound: 4
+          goal: 3
+          maxMistakes: null
+          difficulty: null
+          defaultNextPartId: field-notes
+          draftedAttributeSlugs:
+            - name
+          attributeOptions:
+            - id: country-name
+              slug: name
+          draftedCategoryIds: []
+          draftedItemIds: []
+          rules:
+            - order: 1
+              name: Three correct rounds
+              nextPartId: compare-populations
+              nrOfRounds: null
+              score:
+                - 3
+                - null
+              mistakes: null
+              duration: null
+      - id: compare-populations
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 800
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: atlas-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: taxonomy
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: population-draft
+        taxonomyDraftForPart:
+          taxonomySlug: countries-and-foods
+          nrOfRounds: 5
+          nrOfItemsPerRound: 4
+          goal: 3
+          maxMistakes: null
+          difficulty: null
+          defaultNextPartId: field-notes
+          draftedAttributeSlugs:
+            - population
+          attributeOptions:
+            - id: population
+              slug: population
+          draftedCategoryIds: []
+          draftedItemIds: []
+          rules:
+            - order: 1
+              name: Three correct rounds
+              nextPartId: trace-origins
+              nrOfRounds: null
+              score:
+                - 3
+                - null
+              mistakes: null
+              duration: null
+      - id: trace-origins
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 1200
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: atlas-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: taxonomy
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: origin-draft
+        taxonomyDraftForPart:
+          taxonomySlug: countries-and-foods
+          nrOfRounds: 5
+          nrOfItemsPerRound: 4
+          goal: 3
+          maxMistakes: null
+          difficulty: null
+          defaultNextPartId: field-notes
+          draftedAttributeSlugs:
+            - countryOfOrigin
+          attributeOptions:
+            - id: origins
+              slug: countryOfOrigin
+          draftedCategoryIds: []
+          draftedItemIds: []
+          rules:
+            - order: 1
+              name: Three correct rounds
+              nextPartId: compare-nutrition
+              nrOfRounds: null
+              score:
+                - 3
+                - null
+              mistakes: null
+              duration: null
+      - id: compare-nutrition
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 1600
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: garden-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: taxonomy
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: nutrition-draft
+        taxonomyDraftForPart:
+          taxonomySlug: foods-and-wheel-of-five
+          nrOfRounds: 5
+          nrOfItemsPerRound: 4
+          goal: 3
+          maxMistakes: null
+          difficulty: null
+          defaultNextPartId: field-notes
+          draftedAttributeSlugs:
+            - calories
+            - protein
+            - fiber
+            - averagePrice
+          attributeOptions:
+            - id: calories
+              slug: calories
+            - id: protein
+              slug: protein
+            - id: fiber
+              slug: fiber
+            - id: price
+              slug: averagePrice
+          draftedCategoryIds: []
+          draftedItemIds: []
+          rules:
+            - order: 1
+              name: Three correct rounds
+              nextPartId: wheel-of-five
+              nrOfRounds: null
+              score:
+                - 3
+                - null
+              mistakes: null
+              duration: null
+      - id: wheel-of-five
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 2000
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: garden-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: taxonomy
+        foregroundConfiguration: null
+        announcementTemplateId: null
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: wheel-draft
+        taxonomyDraftForPart:
+          taxonomySlug: foods-and-wheel-of-five
+          nrOfRounds: 5
+          nrOfItemsPerRound: 4
+          goal: 3
+          maxMistakes: null
+          difficulty: null
+          defaultNextPartId: field-notes
+          draftedAttributeSlugs:
+            - wheelOfFive
+          attributeOptions:
+            - id: wheel
+              slug: wheelOfFive
+          draftedCategoryIds: []
+          draftedItemIds: []
+          rules:
+            - order: 1
+              name: Three correct rounds
+              nextPartId: expedition-complete
+              nrOfRounds: null
+              score:
+                - 3
+                - null
+              mistakes: null
+              duration: null
+      - id: field-notes
+        isInitial: false
+        terminationStrategy: NONE
+        position:
+          x: 1200
+          y: 350
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: atlas-motion
+        videoId: null
+        defaultNextPartId: briefing
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: retry
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+        taxonomyDraftForPart: null
+      - id: expedition-complete
+        isInitial: false
+        terminationStrategy: COMPLETE_STORY
+        position:
+          x: 2400
+          y: 0
+        backgroundType: animation
+        backgroundConfiguration: null
+        animationId: garden-motion
+        videoId: null
+        defaultNextPartId: null
+        foregroundType: announcement
+        foregroundConfiguration: null
+        announcementTemplateId: complete
+        quizTemplateId: null
+        quizLogicForPartId: null
+        quizLogicForPart: null
+        taxonomyDraftForPartId: null
+        taxonomyDraftForPart: null

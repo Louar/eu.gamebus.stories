@@ -104,6 +104,7 @@ import type {
 	DataGridClearResult,
 	DataGridCreateResult,
 	DataGridDataAdapter,
+	DataGridDeleteConfirmationOptions,
 	DataGridDeleteDialogState,
 	DataGridDeleteResult,
 	DataGridDuplicateTarget,
@@ -349,6 +350,9 @@ export interface UseDataGridOptions<TData extends RowData> extends DataGridStatu
 		rows: TData[],
 		rowIndices: number[]
 	) => DataGridDeleteResult | boolean | Promise<DataGridDeleteResult | boolean>;
+	/** Disable when onRowsDelete provides its own confirmation dialog. */
+	enableDeleteConfirmation?: boolean;
+	deleteConfirmation?: DataGridDeleteConfirmationOptions;
 	/**
 	 * Duplicates persisted rows and their owned child relations. Returned rows are appended to the grid.
 	 * Pass `true` to use `dataAdapter.duplicate`.
@@ -413,7 +417,7 @@ export interface UseDataGridReturn<TData extends RowData> {
 	) => Promise<Partial<CellPosition> | DataGridCreateResult<TData> | void>;
 
 	// Setters for refs (for bind:this)
-	setDataGridRef: (el: HTMLDivElement | null) => void;
+	setDataGridRef: (el: HTMLDivElement | null, cardColumnIds?: readonly string[]) => void;
 	setHeaderRef: (el: HTMLDivElement | null) => void;
 	setFooterRef: (el: HTMLDivElement | null) => void;
 }
@@ -461,6 +465,8 @@ export function useDataGrid<TData extends RowData>(
 		onRowsAdd: onRowsAddProp,
 		onRowChange: onRowChangeProp,
 		onRowsDelete: onRowsDeleteProp,
+		enableDeleteConfirmation = true,
+		deleteConfirmation,
 		onRowsDuplicate: onRowsDuplicateProp,
 		rowDuplicateTargets: rowDuplicateTargetsProp = [],
 		onDownload: onDownloadProp,
@@ -491,7 +497,7 @@ export function useDataGrid<TData extends RowData>(
 	let dataOverride = $state.raw<TData[] | null>(null);
 	let overrideBase: TData[] | null = null;
 	let searchRevision = $state(0);
-	let searchFilterEnabled = $state(false);
+	let searchFilterEnabled = $state(true);
 	let searchFocusRequest = $state(0);
 	let searchFilterMatchQuery = $state('');
 	const searchMatchRowIdSet = new SvelteSet<string>();
@@ -795,7 +801,7 @@ export function useDataGrid<TData extends RowData>(
 						(rowId) => rowIdentities.getSequenceKey(rowId),
 						(key, mutation) => sequenceRowMutation(key, mutation),
 						dataAdapter.delete
-							? ({ row }, rowId) => dataAdapter.delete!({ row, rowId })
+							? ({ row }, rowId) => dataAdapter.delete!({ row, rowId, force: deleteDialog.force })
 							: undefined,
 						(temporary) => {
 							const temporaryIdSet = new SvelteSet(temporary.map(({ rowId }) => rowId));
@@ -1233,6 +1239,7 @@ export function useDataGrid<TData extends RowData>(
 
 	// Refs
 	let dataGridRef = $state<HTMLDivElement | null>(null);
+	let cardColumnIds = $state<readonly string[] | null>(null);
 	let headerRef = $state<HTMLDivElement | null>(null);
 	let footerRef = $state<HTMLDivElement | null>(null);
 	const rowMapRef = new SvelteMap<number, HTMLDivElement>();
@@ -1538,6 +1545,7 @@ export function useDataGrid<TData extends RowData>(
 	});
 
 	// Paste dialog state
+	let pasteStartPosition: CellPosition | null = null;
 	let pasteDialog = $state<PasteDialogState>({
 		open: false,
 		rowsNeeded: 0,
@@ -1546,7 +1554,8 @@ export function useDataGrid<TData extends RowData>(
 	let deleteDialog = $state<DataGridDeleteDialogState>({
 		open: false,
 		rowCount: 0,
-		isDeleting: false
+		isDeleting: false,
+		force: false
 	});
 	let pendingDeleteRowIds: string[] = [];
 
@@ -1602,14 +1611,15 @@ export function useDataGrid<TData extends RowData>(
 	// ========================================
 
 	function getNavigableColumns() {
-		return table
-			.getAllColumns()
-			.filter(
-				(col) =>
-					col.getIsVisible() &&
-					col.columnDef.meta?.navigable !== false &&
-					col.columnDef.meta?.cell?.variant !== 'row-select'
-			);
+		const columns = cardColumnIds
+			? cardColumnIds.flatMap((id) => table.getAllLeafColumns().filter((col) => col.id === id))
+			: table.getAllColumns();
+		return columns.filter(
+			(col) =>
+				(cardColumnIds !== null || col.getIsVisible()) &&
+				col.columnDef.meta?.navigable !== false &&
+				col.columnDef.meta?.cell?.variant !== 'row-select'
+		);
 	}
 
 	function getFirstNavigableColumnId(): string | null {
@@ -2192,6 +2202,8 @@ export function useDataGrid<TData extends RowData>(
 			const rowsNeeded = startPos.rowIndex + lines.length - rows.length;
 
 			if (rowsNeeded > 0 && resolvedOnRowsAdd) {
+				// Opening the dialog moves focus away from the grid; retain the paste anchor.
+				pasteStartPosition = startPos;
 				pasteDialog = {
 					open: true,
 					rowsNeeded,
@@ -2328,7 +2340,11 @@ export function useDataGrid<TData extends RowData>(
 			const row = rows[rowIndex];
 			if (!row) continue;
 			const meta = table.getColumn(columnId)?.columnDef.meta;
-			const isFileCell = meta?.cell?.variant === 'file' || meta?.cell?.variant === 'file-or-url';
+			const isFileCell =
+				meta?.cell?.variant === 'file' ||
+				meta?.cell?.variant === 'file-or-url' ||
+				meta?.cell?.variant === 'file-with-library-or-url';
+			const retainsLibraryMedia = meta?.cell?.variant === 'file-with-library-or-url';
 			const emptyValue = isFileCell
 				? null
 				: typeof meta?.clipboard?.emptyValue === 'function'
@@ -2340,7 +2356,8 @@ export function useDataGrid<TData extends RowData>(
 			const value = cloneEditValue(snapshot.value);
 			cells.push({
 				key: cellKey,
-				value: isFileCell ? value : null,
+				// Library-aware cells only detach references; assets are deleted from the library page.
+				value: isFileCell && !retainsLibraryMedia ? value : null,
 				context: {
 					rowIndex,
 					rowId,
@@ -2440,14 +2457,16 @@ export function useDataGrid<TData extends RowData>(
 		});
 		if (pendingDeleteRowIds.length === 0) return;
 		deleteDialog = {
-			open: true,
+			open: enableDeleteConfirmation,
 			rowCount: pendingDeleteRowIds.length,
-			isDeleting: false
+			isDeleting: false,
+			force: false
 		};
+		if (!enableDeleteConfirmation) void confirmRowsDelete();
 	}
 
 	async function confirmRowsDelete() {
-		if (!deleteDialog.open || deleteDialog.isDeleting) return;
+		if (pendingDeleteRowIds.length === 0 || deleteDialog.isDeleting) return;
 		const rows = table.getRowModel().rows;
 		const pendingRowIdSet = new SvelteSet(pendingDeleteRowIds);
 		const rowIndices = rows.flatMap((row, rowIndex) =>
@@ -2455,7 +2474,7 @@ export function useDataGrid<TData extends RowData>(
 		);
 		if (rowIndices.length === 0) {
 			pendingDeleteRowIds = [];
-			deleteDialog = { open: false, rowCount: 0, isDeleting: false };
+			deleteDialog = { open: false, rowCount: 0, isDeleting: false, force: false };
 			return;
 		}
 
@@ -2473,7 +2492,7 @@ export function useDataGrid<TData extends RowData>(
 				);
 			}
 			pendingDeleteRowIds = [];
-			deleteDialog = { open: false, rowCount: 0, isDeleting: false };
+			deleteDialog = { open: false, rowCount: 0, isDeleting: false, force: false };
 		} catch (error) {
 			deleteDialog = { ...deleteDialog, isDeleting: false };
 			toast.error(error instanceof Error ? error.message : 'Failed to delete selected rows');
@@ -2530,6 +2549,7 @@ export function useDataGrid<TData extends RowData>(
 				replaceData([...getData(), ...result.rows]);
 			}
 			if (result.rows.length > 0) {
+				table.resetRowSelection();
 				clearSelection();
 			}
 			const duplicatedCount = result.rows.length;
@@ -2681,6 +2701,13 @@ export function useDataGrid<TData extends RowData>(
 	// ========================================
 
 	function handleKeyDown(event: KeyboardEvent) {
+		if (event.defaultPrevented) return;
+		// Card links, selection controls and editors keep their native keyboard behavior.
+		if (cardColumnIds && event.target instanceof Element) {
+			const target = event.target;
+			if (target.closest('a, button, input, select, textarea, [contenteditable="true"]')) return;
+			if (!target.closest('[data-slot="grid-cell-wrapper"]') && target !== dataGridRef) return;
+		}
 		// Search shortcut
 		if ((event.ctrlKey || event.metaKey) && event.key === 'f' && enableSearch) {
 			event.preventDefault();
@@ -3168,6 +3195,9 @@ export function useDataGrid<TData extends RowData>(
 	// Create a reactive meta object using getters so that components always get fresh values
 	// This is critical - without getters, the meta values are captured at creation time and never update
 	const meta = {
+		get cardColumnIds() {
+			return cardColumnIds;
+		},
 		get dataGridRef() {
 			return dataGridRef;
 		},
@@ -3251,14 +3281,19 @@ export function useDataGrid<TData extends RowData>(
 			expectedSnapshots?: ReadonlyMap<string, { generation: number; value: unknown }>
 		) => handleDataUpdate(updates, false, expectedSnapshots, true),
 		onRowsDeleteRequest: requestRowsDelete,
+		deleteConfirmation,
 		onDeleteDialogOpenChange: (open: boolean) => {
 			if (deleteDialog.isDeleting) return;
 			if (!open) pendingDeleteRowIds = [];
 			deleteDialog = {
 				...deleteDialog,
 				open,
-				...(open ? {} : { rowCount: 0 })
+				...(open ? {} : { rowCount: 0, force: false })
 			};
+		},
+		onDeleteDialogForceChange: (force: boolean) => {
+			if (deleteDialog.isDeleting || !deleteConfirmation?.force) return;
+			deleteDialog = { ...deleteDialog, force };
 		},
 		onRowsDeleteConfirm: confirmRowsDelete,
 		onRowsDuplicate: resolvedOnRowsDuplicate ? duplicateSelectedRows : undefined,
@@ -3361,7 +3396,7 @@ export function useDataGrid<TData extends RowData>(
 		onPasteWithExpansion: async () => {
 			if (resolvedOnRowsAdd) {
 				const cols = getNavigableColumns();
-				const startPos = focusedCell ? resolvePosition(focusedCell) : null;
+				const startPos = pasteStartPosition ? resolvePosition(pasteStartPosition) : null;
 				if (!startPos) return;
 				const lines = parseClipboardRows(pasteDialog.clipboardText);
 				const existingRowIds = table
@@ -3387,7 +3422,7 @@ export function useDataGrid<TData extends RowData>(
 		},
 		onPasteWithoutExpansion: () => {
 			const cols = getNavigableColumns();
-			const startPos = focusedCell ? resolvePosition(focusedCell) : null;
+			const startPos = pasteStartPosition ? resolvePosition(pasteStartPosition) : null;
 			if (!startPos) return;
 			const startColIndex = cols.findIndex((c) => c.id === startPos.columnId);
 			performPaste(pasteDialog.clipboardText, startPos, startColIndex);
@@ -3549,10 +3584,12 @@ export function useDataGrid<TData extends RowData>(
 	$effect(() => {
 		const query = searchQuery;
 		const revision = searchRevision;
+		const searchColumns = cardColumnIds;
 		if (!query) return;
 
 		queueMicrotask(() => {
-			if (searchQuery !== query || searchRevision !== revision) return;
+			if (searchQuery !== query || searchRevision !== revision || searchColumns !== cardColumnIds)
+				return;
 			untrack(() => performSearch(query, false));
 		});
 	});
@@ -3598,7 +3635,7 @@ export function useDataGrid<TData extends RowData>(
 	// Effect to create virtualizer when ref becomes available
 	$effect(() => {
 		const ref = dataGridRef;
-		if (!ref) return;
+		if (!ref || cardColumnIds) return;
 
 		// Only create virtualizer once
 		if (virtualizer) return;
@@ -3697,10 +3734,11 @@ export function useDataGrid<TData extends RowData>(
 
 	// Setup keyboard handler on data grid element
 	$effect(() => {
-		if (dataGridRef) {
-			dataGridRef.addEventListener('keydown', handleKeyDown);
+		const ref = dataGridRef;
+		if (ref) {
+			ref.addEventListener('keydown', handleKeyDown);
 			return () => {
-				dataGridRef?.removeEventListener('keydown', handleKeyDown);
+				ref.removeEventListener('keydown', handleKeyDown);
 			};
 		}
 	});
@@ -3811,14 +3849,6 @@ export function useDataGrid<TData extends RowData>(
 	// Search callbacks - these are stable slugs
 	function handleSearchOpenChange(open: boolean) {
 		searchOpen = open;
-		if (!open) {
-			searchQuery = '';
-			searchMatches = [];
-			searchMatchSet.clear();
-			searchMatchRowIdSet.clear();
-			searchFilterMatchQuery = '';
-			matchIndex = 0;
-		}
 	}
 
 	function handleSearchQueryChange(query: string) {
@@ -3880,8 +3910,9 @@ export function useDataGrid<TData extends RowData>(
 		preferences: preferencesController,
 		status,
 		onRowAdd: resolvedOnRowAdd ? handleRowAdd : undefined,
-		setDataGridRef: (el: HTMLDivElement | null) => {
+		setDataGridRef: (el: HTMLDivElement | null, columnIds?: readonly string[]) => {
 			dataGridRef = el;
+			cardColumnIds = columnIds ?? null;
 		},
 		setHeaderRef: (el: HTMLDivElement | null) => {
 			headerRef = el;

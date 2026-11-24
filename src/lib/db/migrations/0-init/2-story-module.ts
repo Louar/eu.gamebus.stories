@@ -56,6 +56,21 @@ export const InitStoryModule: Migration = {
 			.addColumn('duration', 'smallint', (col) => col.notNull())
 			.execute();
 
+		// Create Animation table
+		await db.schema
+			.createTable('animation')
+			.ifNotExists()
+			.addColumn('id', 'uuid', (col) =>
+				col
+					.primaryKey()
+					.defaultTo(sql`uuidv7()`)
+					.notNull()
+			)
+			.addColumn('name', 'text', (col) => col.notNull())
+			.addColumn('configuration', 'jsonb')
+			.addColumn('texts', 'jsonb')
+			.execute();
+
 		// Create Still table
 		await db.schema
 			.createTable('still')
@@ -264,6 +279,9 @@ export const InitStoryModule: Migration = {
 			)
 			.addColumn('still_id', 'uuid', (col) => col.references('still.id').onDelete('set null'))
 			.addColumn('video_id', 'uuid', (col) => col.references('video.id').onDelete('set null'))
+			.addColumn('animation_id', 'uuid', (col) =>
+				col.references('animation.id').onDelete('set null')
+			)
 			.addColumn('announcement_template_id', 'uuid', (col) =>
 				col.references('announcement_template.id').onDelete('set null')
 			)
@@ -353,6 +371,25 @@ export const InitStoryModule: Migration = {
 			.addUniqueConstraint('unique_video_per_story', ['story_id', 'video_id'])
 			.execute();
 
+		// Create AnimationAvailableToStory table
+		await db.schema
+			.createTable('animation_available_to_story')
+			.ifNotExists()
+			.addColumn('id', 'uuid', (col) =>
+				col
+					.primaryKey()
+					.defaultTo(sql`uuidv7()`)
+					.notNull()
+			)
+			.addColumn('story_id', 'uuid', (col) =>
+				col.references('story.id').onDelete('cascade').notNull()
+			)
+			.addColumn('animation_id', 'uuid', (col) =>
+				col.references('animation.id').onDelete('cascade').notNull()
+			)
+			.addUniqueConstraint('unique_animation_per_story', ['story_id', 'animation_id'])
+			.execute();
+
 		// Create StillAvailableToStory table
 		await db.schema
 			.createTable('still_available_to_story')
@@ -420,6 +457,9 @@ export const InitStoryModule: Migration = {
 			)
 			.addColumn('slug', 'text', (col) => col.notNull())
 			.addColumn('name', 'jsonb', (col) => col.notNull())
+			.addColumn('order', 'smallint')
+			.addColumn('thumbnail', 'jsonb')
+			.addColumn('description', 'jsonb')
 			.addColumn('visualization', sql`anthology_visualization`, (col) =>
 				col.defaultTo(AnthologyVisualization.grid).notNull()
 			)
@@ -595,6 +635,7 @@ export const InitStoryModule: Migration = {
 			.addColumn('image', 'jsonb')
 			.addColumn('description', 'jsonb')
 			.addColumn('type', sql`attribute_type`, (col) => col.notNull())
+			.addColumn('question', 'jsonb')
 			.addColumn('referenced_category_id', 'uuid', (col) =>
 				col.references('category.id').onDelete('set null')
 			)
@@ -778,6 +819,7 @@ export const InitStoryModule: Migration = {
 		await db.schema.dropTable('announcement_template_available_to_story').ifExists().execute();
 		await db.schema.dropTable('still_available_to_story').ifExists().execute();
 		await db.schema.dropTable('video_available_to_story').ifExists().execute();
+		await db.schema.dropTable('animation_available_to_story').ifExists().execute();
 
 		await db.schema.dropTable('quiz_logic_rule_input').ifExists().execute();
 		await db.schema.dropTable('quiz_logic_rule').ifExists().execute();
@@ -804,6 +846,7 @@ export const InitStoryModule: Migration = {
 		await db.schema.dropTable('announcement_template').ifExists().execute();
 		await db.schema.dropTable('still').ifExists().execute();
 		await db.schema.dropTable('video').ifExists().execute();
+		await db.schema.dropTable('animation').ifExists().execute();
 		await db.schema.dropTable('attribute_of_item').ifExists().execute();
 		await db.schema.dropTable('item_of_category').ifExists().execute();
 		await db.schema.dropTable('item').ifExists().execute();

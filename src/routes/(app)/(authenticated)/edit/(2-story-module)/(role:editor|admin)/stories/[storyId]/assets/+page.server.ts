@@ -6,6 +6,13 @@ import type { PageServerLoad } from './$types';
 export type AssetRow =
   | {
       id: string;
+      type: 'animation';
+      asset: string;
+      name: string;
+      duration: number;
+    }
+  | {
+      id: string;
       type: 'still';
       asset: string;
       color: string | null;
@@ -34,6 +41,7 @@ export type AssetRow =
     };
 
 const partitionStoryAssets = (rows: AssetRow[]) => {
+  const animations: Extract<AssetRow, { type: 'animation' }>[] = [];
   const videos: Extract<AssetRow, { type: 'video' }>[] = [];
   const stills: Extract<AssetRow, { type: 'still' }>[] = [];
   const announcements: Extract<AssetRow, { type: 'announcement' }>[] = [];
@@ -41,6 +49,9 @@ const partitionStoryAssets = (rows: AssetRow[]) => {
 
   for (const row of rows) {
     switch (row.type) {
+      case 'animation':
+        animations.push(row);
+        break;
       case 'still':
         stills.push(row);
         break;
@@ -56,10 +67,14 @@ const partitionStoryAssets = (rows: AssetRow[]) => {
     }
   }
 
-  return { stills, videos, announcements, quizzes };
+  return { stills, videos, animations, announcements, quizzes };
 };
 
 const partitionAvailableAssets = (rows: AssetRow[]) => {
+  const allAvailableAnimations: (Extract<AssetRow, { type: 'animation' }> & {
+    title: string;
+    summary: string;
+  })[] = [];
   const allAvailableVideos: (Extract<AssetRow, { type: 'video' }> & {
     title: string;
     summary: string;
@@ -79,6 +94,13 @@ const partitionAvailableAssets = (rows: AssetRow[]) => {
 
   for (const asset of rows) {
     switch (asset.type) {
+      case 'animation':
+        allAvailableAnimations.push({
+          ...asset,
+          title: asset.name,
+          summary: formatDuration(asset.duration)
+        });
+        break;
       case 'still':
         allAvailableStills.push({
           ...asset,
@@ -115,6 +137,7 @@ const partitionAvailableAssets = (rows: AssetRow[]) => {
   return {
     allAvailableStills,
     allAvailableVideos,
+    allAvailableAnimations,
     allAvailableAnnouncementTemplates,
     allAvailableQuizTemplates
   };

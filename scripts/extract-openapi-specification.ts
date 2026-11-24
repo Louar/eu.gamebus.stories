@@ -279,6 +279,8 @@ interface OpenApiDocument extends OpenApiExtensionMap {
 }
 
 interface RouteAnalysisContext {
+	optionalRouteParameter?: { name: string; present: boolean };
+	documentedCollectionResponse?: boolean;
 	program: ts.Program;
 	typeChecker: ts.TypeChecker;
 	sourceFile: ts.SourceFile;
@@ -306,8 +308,8 @@ interface OpenApiOverrides {
 }
 
 interface PathOperationAnalysis {
+	openApiPath: string;
 	method: HttpMethod;
-	node: ts.Node | null;
 	operation: OperationObject;
 }
 
@@ -329,13 +331,13 @@ interface SchemaObject extends OpenApiExtensionMap {
 	required?: string[];
 	enum?: Array<string | number | boolean | null>;
 	type?:
-	| 'string'
-	| 'number'
-	| 'integer'
-	| 'boolean'
-	| 'array'
-	| 'object'
-	| Array<'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null'>;
+		| 'string'
+		| 'number'
+		| 'integer'
+		| 'boolean'
+		| 'array'
+		| 'object'
+		| Array<'string' | 'number' | 'integer' | 'boolean' | 'array' | 'object' | 'null'>;
 	format?: string;
 	description?: string;
 	default?: unknown;
@@ -371,9 +373,12 @@ const OUTPUT_FILE = path.resolve('static/generated/openapi-specification.yaml');
 const TAG_ORDER = [
 	'Authentication',
 	'Current user (/me)',
-	'Anthologies',
-	'Stories',
-	'Story assets',
+	'Campaign',
+	'Groups & holdings',
+	'Input collections',
+	'Menu items & app pages',
+	'Missions & skills',
+	'Providers & templates',
 	'Users',
 	'Media',
 	'Clients',
@@ -384,17 +389,17 @@ const TAG_ORDER_INDEX = new Map(TAG_ORDER.map((tag, index) => [tag, index] as co
 
 const DEFAULT_INFO = {
 	info: {
-		title: 'GameBus Stories API',
-		version: '2.0.0'
+		title: 'GameBus Core API',
+		version: '4.0.0'
 	},
 	servers: [
 		{
 			name: 'Production',
-			url: 'https://stories.next.gamebus.eu/api'
+			url: 'https://next.gamebus.eu/api'
 		},
 		{
 			name: 'Development',
-			url: 'http://localhost:5174/api'
+			url: 'http://localhost:5173/api'
 		}
 	],
 	components: {
@@ -477,10 +482,10 @@ export async function generateOpenApiDocument(): Promise<OpenApiDocument> {
 		...DEFAULT_INFO,
 		...(tags.size > 0
 			? {
-				tags: Array.from(tags)
-					.sort(compareTags)
-					.map((name) => ({ name }))
-			}
+					tags: Array.from(tags)
+						.sort(compareTags)
+						.map((name) => ({ name }))
+				}
 			: {}),
 		paths
 	};
@@ -540,9 +545,42 @@ async function analyzeRouteFile(
 	for (const method of HTTP_METHODS) {
 		const node = methodNodes.get(method);
 		if (!node) continue;
-		const operation = await buildOperation({ analysis, filePath, method, node });
-		const merged = mergeOpenApi(operation, openApiOverrides.operations[method]);
-		operations.push({ method, node, operation: merged });
+		const parameter = extractTrailingOptionalRouteParam(filePath);
+		for (const openApiPath of getOpenApiPathsForOperation(
+			method,
+			node,
+			parameter,
+			toOpenApiPath(filePath),
+			toOpenApiPathWithoutTrailingOptionalParameter(filePath),
+			openApiOverrides.operations[method]
+		)) {
+			const parameterPresent = parameter
+				? extractOpenApiPathParamNames(openApiPath).includes(parameter)
+				: false;
+			const operation = await buildOperation({
+				analysis: {
+					...analysis,
+					documentedCollectionResponse:
+						method === 'GET' &&
+						Boolean(parameter) &&
+						!parameterPresent &&
+						typeof openApiOverrides.operations[method]?.['summary-all'] === 'string',
+					...(parameter
+						? {
+								optionalRouteParameter: {
+									name: parameter,
+									present: parameterPresent
+								}
+							}
+						: {})
+				},
+				filePath,
+				method,
+				node
+			});
+			const merged = mergeOpenApi(operation, openApiOverrides.operations[method]);
+			operations.push({ openApiPath, method, operation: merged });
+		}
 	}
 
 	return { operations, pathItemOverrides: openApiOverrides.pathItem };
@@ -724,9 +762,13 @@ function inferResponses(
 	}
 
 	if (Object.keys(responses).length === 0) {
-		responses[defaultStatusForMethod(method)] = defaultResponseForStatus(
-			defaultStatusForMethod(method)
-		);
+		const status = defaultStatusForMethod(method);
+		responses[status] = analysis.documentedCollectionResponse
+			? jsonResponse(Number(status), {
+					type: 'array',
+					items: { type: 'object', additionalProperties: true }
+				})
+			: defaultResponseForStatus(status);
 	}
 
 	addDefaultErrors(responses, node);
@@ -747,12 +789,36 @@ function collectResponses(
 	analysis: RouteAnalysisContext
 ): Array<{ status: number; response: ResponseObject }> {
 	const responses: Array<{ status: number; response: ResponseObject }> = [];
-	visit(node, (child) => {
-		if (!ts.isReturnStatement(child) || !child.expression) return;
-
-		const response = inferResponseFromExpression(child.expression, analysis);
-		if (response) responses.push(response);
-	});
+	// Stop at terminating branches so an item return cannot fall through to the
+	// collection return (or merge its schema with that return).
+	function collect(child: ts.Node): boolean {
+		if (ts.isReturnStatement(child)) {
+			if (child.expression) {
+				const response = inferResponseFromExpression(child.expression, analysis);
+				if (response) responses.push(response);
+				else collect(child.expression);
+			}
+			return true;
+		}
+		if (ts.isThrowStatement(child)) return true;
+		if (ts.isIfStatement(child)) {
+			const condition = inferRouteParameterCondition(child.expression, analysis);
+			if (condition === true) return collect(child.thenStatement);
+			if (condition === false) return child.elseStatement ? collect(child.elseStatement) : false;
+			const thenReturns = collect(child.thenStatement);
+			const elseReturns = child.elseStatement ? collect(child.elseStatement) : false;
+			return thenReturns && elseReturns;
+		}
+		if (ts.isBlock(child)) {
+			for (const statement of child.statements) if (collect(statement)) return true;
+			return false;
+		}
+		child.forEachChild((descendant) => {
+			collect(descendant);
+		});
+		return false;
+	}
+	collect(node);
 	return dedupeResponses(responses);
 }
 
@@ -901,6 +967,16 @@ function inferResponseSchemaFromExpression(
 	if (seen.has(expression)) return inferSchemaFromType(expression, analysis.typeChecker);
 	seen.add(expression);
 
+	if (ts.isConditionalExpression(expression)) {
+		const condition = inferRouteParameterCondition(expression.condition, analysis);
+		if (condition !== undefined)
+			return inferResponseSchemaFromExpression(
+				condition ? expression.whenTrue : expression.whenFalse,
+				analysis,
+				seen
+			);
+	}
+
 	if (
 		ts.isAsExpression(expression) ||
 		ts.isSatisfiesExpression(expression) ||
@@ -958,6 +1034,98 @@ function inferResponseSchemaFromExpression(
 	const runtimeSchema = inferRuntimeSchemaFromExpression(expression, analysis.routeRuntime);
 	const typeSchema = inferSchemaFromType(expression, analysis.typeChecker);
 	return chooseMostSpecificJsonSchema([runtimeSchema, typeSchema]);
+}
+
+function inferRouteParameterCondition(
+	expression: ts.Expression,
+	analysis: RouteAnalysisContext,
+	seen = new Set<ts.Node>()
+): boolean | undefined {
+	const parameter = analysis.optionalRouteParameter;
+	if (!parameter || seen.has(expression)) return undefined;
+	seen.add(expression);
+	if (expression.kind === ts.SyntaxKind.NullKeyword) return false;
+	if (ts.isParenthesizedExpression(expression) || ts.isAsExpression(expression))
+		return inferRouteParameterCondition(expression.expression, analysis, seen);
+	if (
+		ts.isPrefixUnaryExpression(expression) &&
+		expression.operator === ts.SyntaxKind.ExclamationToken
+	) {
+		const value = inferRouteParameterCondition(expression.operand, analysis, seen);
+		return value === undefined ? undefined : !value;
+	}
+	if (ts.isPropertyAccessExpression(expression)) {
+		if (ts.isIdentifier(expression.expression) && expression.expression.text === 'params')
+			return expression.name.text === parameter.name ? parameter.present : undefined;
+		if (expression.name.text === 'length')
+			return inferRouteParameterCondition(expression.expression, analysis, seen);
+	}
+	if (
+		ts.isElementAccessExpression(expression) &&
+		ts.isIdentifier(expression.expression) &&
+		expression.expression.text === 'params' &&
+		ts.isStringLiteralLike(expression.argumentExpression)
+	)
+		return expression.argumentExpression.text === parameter.name ? parameter.present : undefined;
+	if (ts.isIdentifier(expression)) {
+		const initializer = getInitializerFromIdentifier(expression, analysis);
+		const symbol = analysis.typeChecker.getSymbolAtLocation(expression);
+		const declaration = symbol?.valueDeclaration;
+		if (initializer) {
+			const values = [inferRouteParameterCondition(initializer, analysis, new Set(seen))];
+			if (
+				declaration &&
+				ts.isVariableDeclaration(declaration) &&
+				ts.isVariableDeclarationList(declaration.parent) &&
+				!(declaration.parent.flags & ts.NodeFlags.Const)
+			) {
+				// Computed ID/slug aliases may be assigned conditionally. Narrow only
+				// when every possible assignment agrees on parameter presence.
+				visit(analysis.sourceFile, (child) => {
+					if (
+						ts.isBinaryExpression(child) &&
+						child.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+						child.pos < expression.pos &&
+						analysis.typeChecker.getSymbolAtLocation(child.left) === symbol
+					)
+						values.push(inferRouteParameterCondition(child.right, analysis, new Set(seen)));
+				});
+			}
+			return values.every((value) => value === values[0]) ? values[0] : undefined;
+		}
+		if (
+			declaration &&
+			ts.isBindingElement(declaration) &&
+			(declaration.propertyName
+				? getPropertyName(declaration.propertyName)
+				: getBindingElementName(declaration.name)) === parameter.name &&
+			ts.isVariableDeclaration(declaration.parent.parent) &&
+			declaration.parent.parent.initializer?.getText() === 'params'
+		)
+			return parameter.present;
+	}
+	if (ts.isBinaryExpression(expression)) {
+		const left = inferRouteParameterCondition(expression.left, analysis, new Set(seen));
+		if (
+			expression.operatorToken.kind === ts.SyntaxKind.QuestionQuestionToken &&
+			expression.right.kind === ts.SyntaxKind.NullKeyword
+		)
+			return left;
+		const right = inferRouteParameterCondition(expression.right, analysis, new Set(seen));
+		if (expression.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken)
+			return left === false || right === false
+				? false
+				: left === true && right === true
+					? true
+					: undefined;
+		if (expression.operatorToken.kind === ts.SyntaxKind.BarBarToken)
+			return left === true || right === true
+				? true
+				: left === false && right === false
+					? false
+					: undefined;
+	}
+	return undefined;
 }
 
 function isJsonStringifyCall(expression: ts.Expression): expression is ts.CallExpression {
@@ -1296,29 +1464,18 @@ function splitPathItemByOpenApiPath(
 ): Array<[string, PathItemObject]> {
 	const defaultPath = toOpenApiPath(filePath);
 	const trailingOptionalParameter = extractTrailingOptionalRouteParam(filePath);
-	const trimmedPath = trailingOptionalParameter
-		? toOpenApiPathWithoutTrailingOptionalParameter(filePath)
-		: null;
 
 	const pathItems = new Map<string, PathItemObject>();
 
-	for (const { method, node, operation } of operations) {
-		for (const openApiPath of getOpenApiPathsForOperation(
+	for (const { method, openApiPath, operation } of operations) {
+		const pathItem = pathItems.get(openApiPath) ?? {};
+		pathItem[method.toLowerCase() as HttpMethodLower] = withPathParametersForOpenApiPath(
+			operation,
+			openApiPath,
 			method,
-			node,
-			trailingOptionalParameter,
-			defaultPath,
-			trimmedPath
-		)) {
-			const pathItem = pathItems.get(openApiPath) ?? {};
-			pathItem[method.toLowerCase() as HttpMethodLower] = withPathParametersForOpenApiPath(
-				operation,
-				openApiPath,
-				method,
-				trailingOptionalParameter
-			);
-			pathItems.set(openApiPath, pathItem);
-		}
+			trailingOptionalParameter
+		);
+		pathItems.set(openApiPath, pathItem);
 	}
 
 	if (pathItemOverrides) {
@@ -1334,7 +1491,8 @@ function getOpenApiPathsForOperation(
 	node: ts.Node | null,
 	trailingOptionalParameter: string | null,
 	defaultPath: string,
-	trimmedPath: string | null
+	trimmedPath: string | null,
+	operationOverrides: Record<string, unknown> | undefined
 ): string[] {
 	if (!trailingOptionalParameter || (method !== 'GET' && method !== 'POST')) return [defaultPath];
 	if (!trimmedPath) return [defaultPath];
@@ -1344,6 +1502,15 @@ function getOpenApiPathsForOperation(
 	// requireParam(params.param, ...)). In that case the shorter route is not a
 	// valid OpenAPI operation and must not be emitted.
 	if (nodeRequiresParam(node, trailingOptionalParameter)) return [defaultPath];
+
+	// Delegated handlers such as `handlers.GET` hide their parameter usage. An
+	// explicit item/collection contract still identifies both supported GET paths.
+	if (
+		method === 'GET' &&
+		typeof operationOverrides?.['summary-one'] === 'string' &&
+		typeof operationOverrides?.['summary-all'] === 'string'
+	)
+		return [trimmedPath, defaultPath];
 
 	return nodeUsesParam(node, trailingOptionalParameter)
 		? [trimmedPath, defaultPath]
@@ -1878,49 +2045,49 @@ function mergeTranslatableProperties(
 			...runtimeSchema,
 			...(runtimeSchema.oneOf
 				? {
-					oneOf: runtimeSchema.oneOf.map((schema) =>
-						mergeTranslatableProperties(
-							schema,
-							declarationSchema,
-							translatableProperties,
-							program
+						oneOf: runtimeSchema.oneOf.map((schema) =>
+							mergeTranslatableProperties(
+								schema,
+								declarationSchema,
+								translatableProperties,
+								program
+							)
 						)
-					)
-				}
+					}
 				: {}),
 			...(runtimeSchema.anyOf
 				? {
-					anyOf: runtimeSchema.anyOf.map((schema) =>
-						mergeTranslatableProperties(
-							schema,
-							declarationSchema,
-							translatableProperties,
-							program
+						anyOf: runtimeSchema.anyOf.map((schema) =>
+							mergeTranslatableProperties(
+								schema,
+								declarationSchema,
+								translatableProperties,
+								program
+							)
 						)
-					)
-				}
+					}
 				: {}),
 			...(runtimeSchema.allOf
 				? {
-					allOf: runtimeSchema.allOf.map((schema) =>
-						mergeTranslatableProperties(
-							schema,
-							declarationSchema,
-							translatableProperties,
-							program
+						allOf: runtimeSchema.allOf.map((schema) =>
+							mergeTranslatableProperties(
+								schema,
+								declarationSchema,
+								translatableProperties,
+								program
+							)
 						)
-					)
-				}
+					}
 				: {}),
 			...(declarationObject?.properties || runtimeSchema.properties
 				? {
-					properties: mergeTranslatablePropertyMap(
-						runtimeSchema.properties,
-						declarationObject?.properties ?? {},
-						translatableProperties,
-						program
-					)
-				}
+						properties: mergeTranslatablePropertyMap(
+							runtimeSchema.properties,
+							declarationObject?.properties ?? {},
+							translatableProperties,
+							program
+						)
+					}
 				: {})
 		};
 	}
@@ -1954,11 +2121,11 @@ function mergeTranslatablePropertyMap(
 				: isTranslatableSchema(declarationProperties[name])
 					? declarationProperties[name]
 					: mergeTranslatableProperties(
-						schema,
-						declarationProperties[name] ?? null,
-						translatableProperties,
-						program
-					)
+							schema,
+							declarationProperties[name] ?? null,
+							translatableProperties,
+							program
+						)
 		])
 	);
 }

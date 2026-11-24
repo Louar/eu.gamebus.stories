@@ -1,5 +1,3 @@
-import { DEFAULT_CLIENT_SLUG } from '$app/env/private';
-import { createDemoStories } from '$lib/db/migrations/1-dummy-data/2-demo-stories';
 import {
 	findOneAuthenticatedClient,
 	findOneAuthenticatedUser,
@@ -21,6 +19,12 @@ import { error, json, redirect, type Handle } from '@sveltejs/kit';
 import { sequence } from '@sveltejs/kit/hooks';
 
 const ALLOWED_ROLES = new Set<string>([...Object.values(UserRole), 'client']);
+
+const handleReferrerPolicy: Handle = async ({ event, resolve }) => {
+	const response = await resolve(event);
+	response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+	return response;
+};
 
 const handleAuthorization: Handle = async ({ event, resolve }) => {
 	const isApiRoute = event.url.pathname === '/api' || event.url.pathname.startsWith('/api/');
@@ -52,8 +56,6 @@ const handleAuthorization: Handle = async ({ event, resolve }) => {
 
 	const client = await findOneClientByOrigin(origin);
 	locals.client = client;
-
-	if (process.env.NODE_ENV !== 'production' && client.slug === DEFAULT_CLIENT_SLUG) await createDemoStories(client.id);
 
 	const authusr = await findOneAuthenticatedUser(event);
 	locals.authusr = authusr;
@@ -179,4 +181,4 @@ const handleParaglide: Handle = ({ event, resolve }) =>
 		});
 	});
 
-export const handle = sequence(handleParaglide, handleAuthorization);
+export const handle = sequence(handleReferrerPolicy, handleParaglide, handleAuthorization);

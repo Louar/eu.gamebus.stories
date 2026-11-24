@@ -1,7 +1,9 @@
 import { db } from '$lib/db/database';
+import { animationSelection, parseAnimation } from '$lib/db/repositories/2-story-module';
 import type { Media, Translatable, TranslatableMedia } from '$lib/db/schemas/0-utils';
 import { UserRole } from '$lib/db/schemas/1-client-user-module';
 import { StoryPermissionRole } from '$lib/db/schemas/2-story-module';
+import type { AnimationTexts, WebMotionConfig } from '$lib/media/animation';
 import {
 	canModifyStory,
 	isUniqueViolation,
@@ -13,6 +15,15 @@ import z from 'zod/v4';
 import type { RequestHandler } from './$types';
 
 type AssetRow =
+	| {
+			id: string;
+			type: 'animation';
+			asset: string;
+			name: string;
+			configuration: WebMotionConfig;
+			duration: number;
+			texts: AnimationTexts;
+	  }
 	| {
 			id: string;
 			type: 'still';
@@ -45,7 +56,7 @@ type AssetRow =
 			questions: number | null;
 	  };
 
-const assetTypeSchema = z.enum(['still', 'video', 'announcement', 'quiz']);
+const assetTypeSchema = z.enum(['still', 'video', 'animation', 'announcement', 'quiz']);
 type AssetType = z.infer<typeof assetTypeSchema>;
 
 const bodySchema = z.object({
@@ -93,7 +104,7 @@ const assertNever = (x: never): never => {
 };
 
 const typesToFetch = (type?: AssetType): AssetType[] =>
-	type ? [type] : ['still', 'video', 'announcement', 'quiz'];
+	type ? [type] : ['still', 'video', 'animation', 'announcement', 'quiz'];
 
 //
 // Typed list helpers
@@ -145,6 +156,24 @@ const listVideosAllStories = async (args: {
 
 	const rows = await qb.execute();
 	return rows.map((row) => ({ type: 'video', ...row }));
+};
+
+const listAnimations = async (args: {
+	storyId?: string;
+	clientId?: string;
+	permittedStoryIds?: string[] | null;
+}): Promise<Extract<AssetRow, { type: 'animation' }>[]> => {
+	let qb = db
+		.selectFrom('animationAvailableToStory as link')
+		.distinctOn('link.animationId')
+		.innerJoin('animation', 'animation.id', 'link.animationId')
+		.innerJoin('story', 'story.id', 'link.storyId')
+		.orderBy('link.animationId')
+		.select([...animationSelection, 'link.id as id', 'animation.id as asset']);
+	if (args.storyId) qb = qb.where('story.id', '=', args.storyId);
+	if (args.clientId) qb = qb.where('story.clientId', '=', args.clientId);
+	if (args.permittedStoryIds) qb = qb.where('story.id', 'in', args.permittedStoryIds);
+	return (await qb.execute()).map((row) => ({ type: 'animation', ...parseAnimation(row) }));
 };
 
 const listAnnouncementsAllStories = async (args: {
@@ -274,6 +303,8 @@ const findInsertedAssetRow = async (storyId: string, type: AssetType, linkId: st
 				return listStillsForStory(storyId);
 			case 'video':
 				return listVideosForStory(storyId);
+			case 'animation':
+				return listAnimations({ storyId });
 			case 'announcement':
 				return listAnnouncementsForStory(storyId);
 			case 'quiz':
@@ -294,6 +325,15 @@ const findInsertedAssetRow = async (storyId: string, type: AssetType, linkId: st
 
 const ensureAssetExists = async (type: AssetType, assetId: string) => {
 	switch (type) {
+		case 'animation': {
+			const asset = await db
+				.selectFrom('animation')
+				.where('id', '=', assetId)
+				.select('id')
+				.executeTakeFirst();
+			if (!asset) error(404, 'Animation not found');
+			return;
+		}
 		case 'still': {
 			const asset = await db
 				.selectFrom('still')
@@ -341,6 +381,20 @@ const ensureSourceAccess = async (args: {
 	assetId: string;
 	permittedStoryIds: string[] | null;
 }) => {
+	if (args.type === 'animation') {
+		let qb = db
+			.selectFrom('animationAvailableToStory as sourceLink')
+			.innerJoin('story as sourceStory', 'sourceStory.id', 'sourceLink.storyId')
+			.where('sourceStory.clientId', '=', args.clientId)
+			.where('sourceLink.animationId', '=', args.assetId)
+			.select('sourceLink.id');
+		if (args.permittedStoryIds !== null) {
+			if (!args.permittedStoryIds.length) error(403, 'You are not allowed to use this asset');
+			qb = qb.where('sourceStory.id', 'in', args.permittedStoryIds);
+		}
+		if (!(await qb.executeTakeFirst())) error(403, 'You are not allowed to use this asset');
+		return;
+	}
 	// Admin/unrestricted
 	if (args.permittedStoryIds === null) return;
 
@@ -439,6 +493,8 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 					return listStillsAllStories({ clientId, permittedStoryIds });
 				case 'video':
 					return listVideosAllStories({ clientId, permittedStoryIds });
+				case 'animation':
+					return listAnimations({ clientId, permittedStoryIds });
 				case 'announcement':
 					return listAnnouncementsAllStories({ clientId, permittedStoryIds });
 				case 'quiz':
@@ -461,6 +517,8 @@ export const GET: RequestHandler = async ({ locals, params, url }) => {
 				return listStillsForStory(storyId);
 			case 'video':
 				return listVideosForStory(storyId);
+			case 'animation':
+				return listAnimations({ storyId });
 			case 'announcement':
 				return listAnnouncementsForStory(storyId);
 			case 'quiz':
@@ -505,6 +563,14 @@ export const POST: RequestHandler = async ({ locals, params, request }) => {
 
 	try {
 		switch (type) {
+			case 'animation': {
+				const inserted = await db
+					.insertInto('animationAvailableToStory')
+					.values({ storyId, animationId: assetId })
+					.returning('id')
+					.executeTakeFirstOrThrow();
+				return json(await findInsertedAssetRow(storyId, type, inserted.id), { status: 201 });
+			}
 			case 'still': {
 				const inserted = await db
 					.insertInto('stillAvailableToStory')
@@ -567,6 +633,25 @@ export const DELETE: RequestHandler = async ({ locals, params, request }) => {
 	const { asset: assetId, type } = parsed.data;
 
 	switch (type) {
+		case 'animation': {
+			await ensureTargetStory(locals.client.id, storyId);
+			await db.transaction().execute(async (trx) => {
+				const deleted = await trx
+					.deleteFrom('animationAvailableToStory')
+					.where('storyId', '=', storyId)
+					.where('animationId', '=', assetId)
+					.returning('id')
+					.executeTakeFirst();
+				if (!deleted) error(404, 'Availability link not found');
+				await trx
+					.updateTable('part')
+					.where('storyId', '=', storyId)
+					.where('animationId', '=', assetId)
+					.set({ animationId: null, backgroundType: null, backgroundConfiguration: null })
+					.execute();
+			});
+			return json({ status: 'removed' });
+		}
 		case 'still': {
 			const deleted = await db
 				.deleteFrom('stillAvailableToStory')

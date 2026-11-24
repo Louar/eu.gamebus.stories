@@ -41,6 +41,8 @@
 		type PartResourceEditorSelection
 	} from './ResourceInspector.svelte';
 	import StorySettingsEditor from './StorySettingsEditor.svelte';
+	import type { AnimationEditorOutput } from './AnimationEditor.svelte';
+	import ClapperboardIcon from '@lucide/svelte/icons/clapperboard';
 	import {
 		getStoryFlowPreferencesKey,
 		parseStoryFlowPreferences,
@@ -74,6 +76,8 @@
 	const isEditingVideo = (id?: string) =>
 		editorSelection?.kind === 'video' && editorSelection.id === id;
 	const isAddingVideo = () => editorSelection?.kind === 'video-library';
+	const isEditingAnimation = (id?: string) =>
+		editorSelection?.kind === 'animation' && editorSelection.id === id;
 	const isEditingAnnouncement = (id?: string) =>
 		editorSelection?.kind === 'announcement' && editorSelection.id === id;
 	const isEditingQuiz = (id?: string) =>
@@ -90,6 +94,8 @@
 		if (!selection.id) return selection;
 		if (selection.kind === 'still')
 			return story.stills.some((item) => item.id === selection.id) ? selection : null;
+		if (selection.kind === 'animation')
+			return story.animations.some((item) => item.id === selection.id) ? selection : null;
 		if (selection.kind === 'video')
 			return story.videos.some((item) => item.id === selection.id) ? selection : null;
 		if (selection.kind === 'announcement')
@@ -148,6 +154,7 @@
 	onMount(() => {
 		EDITORS.videos = story.videos;
 		EDITORS.stills = story.stills;
+		EDITORS.animations = story.animations;
 		EDITORS.announcements = story.announcements;
 		EDITORS.quizzes = story.quizzes;
 		EDITORS.taxonomies = story.taxonomies;
@@ -176,6 +183,10 @@
 		editorSelection = { kind: 'still', id };
 		inspectorOpen = true;
 	};
+	const openAnimation = (id?: string) => {
+		editorSelection = { kind: 'animation', id };
+		inspectorOpen = true;
+	};
 	const openVideo = (id?: string) => {
 		editorSelection = { kind: 'video', id };
 		inspectorOpen = true;
@@ -201,7 +212,8 @@
 		const rootFontSize = Number.parseFloat(
 			window.getComputedStyle(document.documentElement).fontSize
 		);
-		const resourceInspectorRight = (sidebarOpen ? 24 : 0) * rootFontSize + 30 * rootFontSize;
+		const resourceInspectorWidth = editorSelection?.kind === 'animation' ? 48 : 30;
+		const resourceInspectorRight = ((sidebarOpen ? 24 : 0) + resourceInspectorWidth) * rootFontSize;
 		const partInspectorWidth = Math.min(44 * rootFontSize, window.innerWidth - 4 * rootFontSize);
 
 		return resourceInspectorRight <= window.innerWidth - partInspectorWidth;
@@ -211,6 +223,10 @@
 			mainTab = 'backgrounds';
 			backgroundTab = 'stills';
 			openStill(selection.id);
+		} else if (selection.kind === 'animation') {
+			mainTab = 'backgrounds';
+			backgroundTab = 'animations';
+			openAnimation(selection.id);
 		} else if (selection.kind === 'video') {
 			mainTab = 'backgrounds';
 			backgroundTab = 'videos';
@@ -317,6 +333,39 @@
 					: [...story.stills, still]
 			};
 			if (!keepOpen) editorSelection = { kind: 'still', id: still.id };
+		}
+	};
+	const closeAnimation = (
+		{ action, id, animation }: AnimationEditorOutput,
+		selection: EditorSelection
+	) => {
+		if (action === 'persist' && animation) {
+			EDITORS.animations = EDITORS.animations.some((item) => item.id === animation.id)
+				? EDITORS.animations.map((item) => (item.id === animation.id ? animation : item))
+				: [...EDITORS.animations, animation];
+			story = { ...story, animations: EDITORS.animations };
+			if (editorSelection === selection && editorSelection?.kind === 'animation') {
+				// Preserve the keyed editor and focus when a new animation receives its ID.
+				editorSelection.id = animation.id;
+			}
+		} else {
+			if (action === 'delete' && id) {
+				if (selectedPart?.animationId === id) selectedPartId = undefined;
+				EDITORS.animations = EDITORS.animations.filter((item) => item.id !== id);
+				story = {
+					...story,
+					animations: EDITORS.animations,
+					parts: story.parts.map((part) =>
+						part.animationId === id
+							? { ...part, animationId: null, backgroundType: null, backgroundConfiguration: null }
+							: part
+					)
+				};
+			}
+			if (editorSelection === selection) {
+				editorSelection = null;
+				inspectorOpen = false;
+			}
 		}
 	};
 	const closeAnnouncement = (output: {
@@ -503,9 +552,10 @@
 
 				<Tabs.Content value="backgrounds">
 					<Tabs.Root bind:value={backgroundTab} class="gap-3">
-						<Tabs.List class="grid w-full grid-cols-2">
+						<Tabs.List class="grid w-full grid-cols-3">
 							<Tabs.Trigger value="stills"><ImageIcon />Stills</Tabs.Trigger>
 							<Tabs.Trigger value="videos"><VideoIcon />Videos</Tabs.Trigger>
+							<Tabs.Trigger value="animations"><ClapperboardIcon />Animations</Tabs.Trigger>
 						</Tabs.List>
 						<Tabs.Content value="stills">
 							<Button
@@ -530,6 +580,33 @@
 												<ImageIcon /><span class="truncate"
 													>{still.image?.filename ?? still.color ?? 'Untitled still'}</span
 												>
+											</Command.Item>
+										{/each}
+									</Command.Group>
+								</Command.List>
+							</Command.Root>
+						</Tabs.Content>
+						<Tabs.Content value="animations">
+							<Button
+								type="button"
+								variant={isEditingAnimation() ? 'default' : 'outline'}
+								class="mb-3 w-full justify-start"
+								onclick={() => openAnimation()}
+							>
+								<PlusIcon />Create animation
+							</Button>
+							<Command.Root class="border bg-sidebar-accent/30">
+								<Command.Input placeholder="Search animations..." />
+								<Command.List class="max-h-auto">
+									<Command.Empty>No animations found.</Command.Empty>
+									<Command.Group>
+										{#each EDITORS.animations as animation (animation.id)}
+											<Command.Item
+												value={`${animation.name} ${animation.id}`}
+												class={isEditingAnimation(animation.id) ? activeCommandItemClass : ''}
+												onSelect={() => openAnimation(animation.id)}
+											>
+												<ClapperboardIcon /><span class="truncate">{animation.name}</span>
 											</Command.Item>
 										{/each}
 									</Command.Group>
@@ -680,6 +757,7 @@
 		bind:selection={editorSelection}
 		bind:open={inspectorOpen}
 		{closeStill}
+		{closeAnimation}
 		{closeVideo}
 		{addVideo}
 		{closeAnnouncement}

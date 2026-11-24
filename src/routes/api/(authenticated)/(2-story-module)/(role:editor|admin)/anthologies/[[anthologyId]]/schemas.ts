@@ -1,4 +1,8 @@
-import { formObjectPreprocessor, translatableValidator } from '$lib/db/schemas/0-utils';
+import {
+	formObjectPreprocessor,
+	translatableMediaValidator,
+	translatableValidator
+} from '$lib/db/schemas/0-utils';
 import { AnthologyVisualization } from '$lib/db/schemas/2-story-module';
 import { z } from 'zod/v4';
 
@@ -10,9 +14,21 @@ const anthologyPositionSchema = z.object({
 	isRemoved: z.boolean().optional().default(false)
 });
 
+const anthologyThumbnailSchema = z.preprocess(
+	formObjectPreprocessor,
+	translatableMediaValidator.nullable()
+);
+const anthologyDescriptionSchema = z.preprocess(
+	formObjectPreprocessor,
+	translatableValidator.nullable()
+);
+
 const anthologyFieldsSchema = z.object({
 	slug: z.string().min(1),
 	nameRaw: z.preprocess(formObjectPreprocessor, translatableValidator),
+	order: z.number().nullable(),
+	thumbnail: anthologyThumbnailSchema.default(null),
+	description: anthologyDescriptionSchema.default(null),
 	visualization: z.enum(Object.values(AnthologyVisualization)),
 	configuration: z.object({ showPerformanceOverview: z.boolean() }).nullable(),
 	isPublished: z.boolean(),
@@ -21,6 +37,7 @@ const anthologyFieldsSchema = z.object({
 });
 
 export const anthologyCreateSchema = anthologyFieldsSchema.extend({
+	order: anthologyFieldsSchema.shape.order.default(null),
 	visualization: anthologyFieldsSchema.shape.visualization.default(AnthologyVisualization.grid),
 	configuration: anthologyFieldsSchema.shape.configuration.default(null),
 	isPublished: anthologyFieldsSchema.shape.isPublished.default(false),
@@ -28,4 +45,7 @@ export const anthologyCreateSchema = anthologyFieldsSchema.extend({
 	positions: anthologyFieldsSchema.shape.positions.default([])
 });
 
-export const anthologyPatchSchema = anthologyFieldsSchema.partial();
+export const anthologyPatchSchema = anthologyFieldsSchema.partial().extend({
+	thumbnail: anthologyThumbnailSchema.optional(),
+	description: anthologyDescriptionSchema.optional()
+});

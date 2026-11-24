@@ -1,4 +1,5 @@
 import type { TaxonomyRound } from '$lib/components/app/player/taxonomy/types';
+import { getTaxonomyRoundQuestionKey } from '$lib/components/app/player/taxonomy/rounds';
 import { db } from '$lib/db/database';
 import { selectLocalizedField, type Language } from '$lib/db/schemas/0-utils';
 import {
@@ -36,17 +37,23 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 			sql<string[]>`coalesce((
 				select jsonb_agg(drafted_category.category_id)
 				from drafted_category
+				inner join category on category.id = drafted_category.category_id
 				where drafted_category.taxonomy_draft_for_part_id = ${eb.ref('taxonomyDraftForPart.id')}
+					and category.taxonomy_id = ${eb.ref('taxonomyDraftForPart.taxonomyId')}
 			), '[]'::jsonb)`.as('categories'),
 			sql<string[]>`coalesce((
 				select jsonb_agg(drafted_attribute.attribute_id)
 				from drafted_attribute
+				inner join attribute on attribute.id = drafted_attribute.attribute_id
 				where drafted_attribute.taxonomy_draft_for_part_id = ${eb.ref('taxonomyDraftForPart.id')}
+					and attribute.taxonomy_id = ${eb.ref('taxonomyDraftForPart.taxonomyId')}
 			), '[]'::jsonb)`.as('attributes'),
 			sql<string[]>`coalesce((
 				select jsonb_agg(drafted_item.item_id)
 				from drafted_item
+				inner join item on item.id = drafted_item.item_id
 				where drafted_item.taxonomy_draft_for_part_id = ${eb.ref('taxonomyDraftForPart.id')}
+					and item.taxonomy_id = ${eb.ref('taxonomyDraftForPart.taxonomyId')}
 			), '[]'::jsonb)`.as('items')
 		])
 		.executeTakeFirst();
@@ -156,6 +163,7 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 				selectLocalizedField(eb, 'category.name', language).as('categoryName'),
 				'targetAttribute.id as attributeId',
 				selectLocalizedField(eb, 'targetAttribute.name', language).as('attributeName'),
+				selectLocalizedField(eb, 'targetAttribute.question', language).as('attributeQuestion'),
 				'targetAttribute.type as attributeType',
 				'targetAttribute.schema',
 				'targetAttribute.referencedCategoryId'
@@ -191,6 +199,7 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 					attributes: {
 						id: string;
 						name: string | null;
+						question: string | null;
 						referencedCategoryId: string | null;
 						type: AttributeTypeValue;
 						schema: Record<string, unknown> | null;
@@ -207,6 +216,7 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 			categories[combination.categoryId].attributes.push({
 				id: combination.attributeId,
 				name: combination.attributeName,
+				question: combination.attributeQuestion,
 				referencedCategoryId: combination.referencedCategoryId,
 				type: combination.attributeType,
 				schema: combination.schema
@@ -215,76 +225,91 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 		}, {})
 	);
 
-	const rounds = await Promise.all(
-		Array.from({ length: nrOfRounds }, async (): Promise<TaxonomyRound | null> => {
-			const category = randomItem(categories);
-			if (!category) return null;
-			const attribute = randomItem(category.attributes);
-			const mapCategoryId =
-				attribute.type === AttributeType.translatableCategory
-					? category.id
-					: attribute.referencedCategoryId;
-			const mapCategory = mapCategoryId
-				? await db
-						.selectFrom('category')
-						.where('category.id', '=', mapCategoryId)
-						.where('category.taxonomyId', '=', category.taxonomyId)
-						.select(['category.map', 'category.taxonomyId'])
-						.executeTakeFirst()
-				: null;
-			const mapItems = mapCategoryId
-				? await db
-						.selectFrom('item as mapItem')
-						.innerJoin('itemOfCategory as mapItemOfCategory', (join) =>
-							join
-								.onRef('mapItemOfCategory.itemId', '=', 'mapItem.id')
-								.on('mapItemOfCategory.categoryId', '=', mapCategoryId)
-						)
-						.innerJoin('attribute as shapeAttribute', (join) =>
-							join
-								.on('shapeAttribute.taxonomyId', '=', category.taxonomyId)
-								.on('shapeAttribute.slug', '=', 'shape')
-						)
-						.innerJoin('attributeOfItem as shapeItemAttribute', (join) =>
-							join
-								.onRef('shapeItemAttribute.itemId', '=', 'mapItem.id')
-								.onRef('shapeItemAttribute.attributeId', '=', 'shapeAttribute.id')
-						)
-						.leftJoin('attribute as centerAttribute', (join) =>
-							join
-								.on('centerAttribute.taxonomyId', '=', category.taxonomyId)
-								.on('centerAttribute.slug', '=', 'center')
-						)
-						.leftJoin('attributeOfItem as centerItemAttribute', (join) =>
-							join
-								.onRef('centerItemAttribute.itemId', '=', 'mapItem.id')
-								.onRef('centerItemAttribute.attributeId', '=', 'centerAttribute.id')
-						)
-						.leftJoin('attribute as colorAttribute', (join) =>
-							join
-								.on('colorAttribute.taxonomyId', '=', category.taxonomyId)
-								.on('colorAttribute.slug', '=', 'color')
-						)
-						.leftJoin('attributeOfItem as colorItemAttribute', (join) =>
-							join
-								.onRef('colorItemAttribute.itemId', '=', 'mapItem.id')
-								.onRef('colorItemAttribute.attributeId', '=', 'colorAttribute.id')
-						)
-						.leftJoin('attribute as iconsAttribute', (join) =>
-							join
-								.on('iconsAttribute.taxonomyId', '=', category.taxonomyId)
-								.on('iconsAttribute.slug', '=', 'icons')
-						)
-						.leftJoin('attributeOfItem as iconsItemAttribute', (join) =>
-							join
-								.onRef('iconsItemAttribute.itemId', '=', 'mapItem.id')
-								.onRef('iconsItemAttribute.attributeId', '=', 'iconsAttribute.id')
-						)
-						.where('mapItem.taxonomyId', '=', category.taxonomyId)
-						.where('shapeItemAttribute.value', 'is not', null)
-						.select((eb) => [
-							'mapItem.id as id',
-							sql<string | null>`(
+	const rounds: TaxonomyRound[] = [];
+	const usedRoundKeys = new Set<string>();
+	const maxAttempts = Math.max(nrOfRounds * 10, categories.length * 10);
+	for (let attempt = 0; rounds.length < nrOfRounds && attempt < maxAttempts; attempt += 1) {
+		const category = randomItem(categories);
+		if (!category) break;
+		const attribute = randomItem(category.attributes);
+		if (!attribute) continue;
+		const round = await createRound(category, attribute);
+		if (!round) continue;
+		const roundKey = getTaxonomyRoundQuestionKey(round);
+		if (usedRoundKeys.has(roundKey)) continue;
+		usedRoundKeys.add(roundKey);
+		rounds.push(round);
+	}
+
+	async function createRound(
+		category: (typeof categories)[number],
+		attribute: (typeof categories)[number]['attributes'][number]
+	): Promise<TaxonomyRound | null> {
+		const mapCategoryId =
+			attribute.type === AttributeType.translatableCategory
+				? category.id
+				: attribute.referencedCategoryId;
+		const mapCategory = mapCategoryId
+			? await db
+					.selectFrom('category')
+					.where('category.id', '=', mapCategoryId)
+					.where('category.taxonomyId', '=', category.taxonomyId)
+					.select(['category.map', 'category.taxonomyId'])
+					.executeTakeFirst()
+			: null;
+		const mapItems = mapCategoryId
+			? await db
+					.selectFrom('item as mapItem')
+					.innerJoin('itemOfCategory as mapItemOfCategory', (join) =>
+						join
+							.onRef('mapItemOfCategory.itemId', '=', 'mapItem.id')
+							.on('mapItemOfCategory.categoryId', '=', mapCategoryId)
+					)
+					.innerJoin('attribute as shapeAttribute', (join) =>
+						join
+							.on('shapeAttribute.taxonomyId', '=', category.taxonomyId)
+							.on('shapeAttribute.slug', '=', 'shape')
+					)
+					.innerJoin('attributeOfItem as shapeItemAttribute', (join) =>
+						join
+							.onRef('shapeItemAttribute.itemId', '=', 'mapItem.id')
+							.onRef('shapeItemAttribute.attributeId', '=', 'shapeAttribute.id')
+					)
+					.leftJoin('attribute as centerAttribute', (join) =>
+						join
+							.on('centerAttribute.taxonomyId', '=', category.taxonomyId)
+							.on('centerAttribute.slug', '=', 'center')
+					)
+					.leftJoin('attributeOfItem as centerItemAttribute', (join) =>
+						join
+							.onRef('centerItemAttribute.itemId', '=', 'mapItem.id')
+							.onRef('centerItemAttribute.attributeId', '=', 'centerAttribute.id')
+					)
+					.leftJoin('attribute as colorAttribute', (join) =>
+						join
+							.on('colorAttribute.taxonomyId', '=', category.taxonomyId)
+							.on('colorAttribute.slug', '=', 'color')
+					)
+					.leftJoin('attributeOfItem as colorItemAttribute', (join) =>
+						join
+							.onRef('colorItemAttribute.itemId', '=', 'mapItem.id')
+							.onRef('colorItemAttribute.attributeId', '=', 'colorAttribute.id')
+					)
+					.leftJoin('attribute as iconsAttribute', (join) =>
+						join
+							.on('iconsAttribute.taxonomyId', '=', category.taxonomyId)
+							.on('iconsAttribute.slug', '=', 'icons')
+					)
+					.leftJoin('attributeOfItem as iconsItemAttribute', (join) =>
+						join
+							.onRef('iconsItemAttribute.itemId', '=', 'mapItem.id')
+							.onRef('iconsItemAttribute.attributeId', '=', 'iconsAttribute.id')
+					)
+					.where('mapItem.taxonomyId', '=', category.taxonomyId)
+					.where('shapeItemAttribute.value', 'is not', null)
+					.select((eb) => [
+						'mapItem.id as id',
+						sql<string | null>`(
 								select nullif(
 									string_agg(
 										coalesce(
@@ -304,84 +329,84 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 								where default_attribute.category_id = ${eb.ref('mapItemOfCategory.categoryId')}
 									and default_attribute.is_default = true
 							)`.as('name'),
-							'shapeItemAttribute.value as shape',
-							'centerItemAttribute.value as center',
-							'colorItemAttribute.value as color',
-							'iconsItemAttribute.value as icons'
-						])
-						.execute()
-				: [];
-
-			const items = await db
-				.selectFrom('item')
-				.innerJoin('itemOfCategory', 'itemOfCategory.itemId', 'item.id')
-				.innerJoin('attributeOfItem as targetItemAttribute', (join) =>
-					join
-						.onRef('targetItemAttribute.itemId', '=', 'item.id')
-						.on('targetItemAttribute.attributeId', '=', attribute.id)
-				)
-				.innerJoin(
-					'attribute as targetAttribute',
-					'targetAttribute.id',
-					'targetItemAttribute.attributeId'
-				)
-				.leftJoin(
-					'item as referencedItem',
-					'referencedItem.id',
-					'targetItemAttribute.referencedItemId'
-				)
-				.where('item.taxonomyId', '=', category.taxonomyId)
-				.where('itemOfCategory.categoryId', '=', category.id)
-				.$if(selectedItemIds.length > 0, (qb) => qb.where('item.id', 'in', selectedItemIds))
-				.$if(difficulty !== null, (qb) =>
-					qb.where('targetItemAttribute.difficulty', '<=', difficulty)
-				)
-				.where((eb) =>
-					eb.or([
-						eb.and([
-							eb('targetAttribute.type', '=', AttributeType.number),
-							eb('targetItemAttribute.value', 'is not', null)
-						]),
-						eb.and([
-							eb('targetAttribute.type', '=', AttributeType.translatableCategory),
-							eb('targetItemAttribute.value', 'is not', null)
-						]),
-						eb.and([
-							eb('targetAttribute.type', '=', AttributeType.itemReference),
-							eb('targetItemAttribute.referencedItemId', 'is not', null)
-						])
+						'shapeItemAttribute.value as shape',
+						'centerItemAttribute.value as center',
+						'colorItemAttribute.value as color',
+						'iconsItemAttribute.value as icons'
 					])
-				)
-				.where((eb) =>
-					eb.exists(
-						eb
-							.selectFrom('attributeOfCategory as defaultAttribute')
-							.innerJoin('attributeOfItem as nameAttribute', (join) =>
-								join
-									.onRef('nameAttribute.itemId', '=', 'item.id')
-									.onRef('nameAttribute.attributeId', '=', 'defaultAttribute.attributeId')
+					.execute()
+			: [];
+
+		const items = await db
+			.selectFrom('item')
+			.innerJoin('itemOfCategory', 'itemOfCategory.itemId', 'item.id')
+			.innerJoin('attributeOfItem as targetItemAttribute', (join) =>
+				join
+					.onRef('targetItemAttribute.itemId', '=', 'item.id')
+					.on('targetItemAttribute.attributeId', '=', attribute.id)
+			)
+			.innerJoin(
+				'attribute as targetAttribute',
+				'targetAttribute.id',
+				'targetItemAttribute.attributeId'
+			)
+			.leftJoin(
+				'item as referencedItem',
+				'referencedItem.id',
+				'targetItemAttribute.referencedItemId'
+			)
+			.where('item.taxonomyId', '=', category.taxonomyId)
+			.where('itemOfCategory.categoryId', '=', category.id)
+			.$if(selectedItemIds.length > 0, (qb) => qb.where('item.id', 'in', selectedItemIds))
+			.$if(difficulty !== null, (qb) =>
+				qb.where('targetItemAttribute.difficulty', '<=', difficulty)
+			)
+			.where((eb) =>
+				eb.or([
+					eb.and([
+						eb('targetAttribute.type', '=', AttributeType.number),
+						eb('targetItemAttribute.value', 'is not', null)
+					]),
+					eb.and([
+						eb('targetAttribute.type', '=', AttributeType.translatableCategory),
+						eb('targetItemAttribute.value', 'is not', null)
+					]),
+					eb.and([
+						eb('targetAttribute.type', '=', AttributeType.itemReference),
+						eb('targetItemAttribute.referencedItemId', 'is not', null)
+					])
+				])
+			)
+			.where((eb) =>
+				eb.exists(
+					eb
+						.selectFrom('attributeOfCategory as defaultAttribute')
+						.innerJoin('attributeOfItem as nameAttribute', (join) =>
+							join
+								.onRef('nameAttribute.itemId', '=', 'item.id')
+								.onRef('nameAttribute.attributeId', '=', 'defaultAttribute.attributeId')
+						)
+						.whereRef('defaultAttribute.categoryId', '=', 'itemOfCategory.categoryId')
+						.where('defaultAttribute.isDefault', '=', true)
+						.where((innerEb) =>
+							innerEb(
+								innerEb.fn.coalesce(
+									sql<
+										string | null
+									>`${innerEb.ref('nameAttribute.value')}->>${language ?? 'default'}`,
+									sql<string | null>`${innerEb.ref('nameAttribute.value')}->>'default'`,
+									sql<string | null>`${innerEb.ref('nameAttribute.value')}->>'en'`
+								),
+								'is not',
+								null
 							)
-							.whereRef('defaultAttribute.categoryId', '=', 'itemOfCategory.categoryId')
-							.where('defaultAttribute.isDefault', '=', true)
-							.where((innerEb) =>
-								innerEb(
-									innerEb.fn.coalesce(
-										sql<
-											string | null
-										>`${innerEb.ref('nameAttribute.value')}->>${language ?? 'default'}`,
-										sql<string | null>`${innerEb.ref('nameAttribute.value')}->>'default'`,
-										sql<string | null>`${innerEb.ref('nameAttribute.value')}->>'en'`
-									),
-									'is not',
-									null
-								)
-							)
-							.select('defaultAttribute.attributeId')
-					)
+						)
+						.select('defaultAttribute.attributeId')
 				)
-				.select((eb) => [
-					'item.id as id',
-					sql<string | null>`(
+			)
+			.select((eb) => [
+				'item.id as id',
+				sql<string | null>`(
 						select nullif(
 							string_agg(
 								coalesce(
@@ -401,9 +426,9 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 						where default_attribute.category_id = ${eb.ref('itemOfCategory.categoryId')}
 							and default_attribute.is_default = true
 					)`.as('name'),
-					'targetItemAttribute.value as value',
-					'targetItemAttribute.referencedItemId as referencedItemId',
-					sql<string | null>`(
+				'targetItemAttribute.value as value',
+				'targetItemAttribute.referencedItemId as referencedItemId',
+				sql<string | null>`(
 						select nullif(
 							string_agg(
 								coalesce(
@@ -423,33 +448,33 @@ export async function loadTaxonomyGame(clientId: string, draftId: string, langua
 						where default_attribute.category_id = ${eb.ref('targetAttribute.referencedCategoryId')}
 							and default_attribute.is_default = true
 					)`.as('referencedName')
-				])
-				.orderBy(sql`random()`)
-				.limit(nrOfItemsPerRound)
-				.execute();
+			])
+			.orderBy(sql`random()`)
+			.limit(nrOfItemsPerRound)
+			.execute();
 
-			return {
-				category: {
-					id: category.id,
-					name: category.name
-				},
-				attribute: {
-					id: attribute.id,
-					name: attribute.name,
-					referencedCategoryId: attribute.referencedCategoryId,
-					type: attribute.type,
-					schema: attribute.schema
-				},
-				items,
-				map: mapCategory?.map ?? null,
-				mapItems
-			};
-		})
-	);
+		return {
+			category: {
+				id: category.id,
+				name: category.name
+			},
+			attribute: {
+				id: attribute.id,
+				name: attribute.name,
+				question: attribute.question,
+				referencedCategoryId: attribute.referencedCategoryId,
+				type: attribute.type,
+				schema: attribute.schema
+			},
+			items,
+			map: mapCategory?.map ?? null,
+			mapItems
+		};
+	}
 
 	return {
-		rounds: rounds.filter((round): round is TaxonomyRound => round !== null),
-		goal,
+		rounds,
+		goal: Math.min(goal, rounds.length),
 		maxMistakes,
 		difficulty,
 		showHints: false as const,

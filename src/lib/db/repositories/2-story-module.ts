@@ -7,11 +7,38 @@ import {
 } from '$lib/db/schemas/0-utils';
 import { LogicHitpolicy } from '$lib/db/schemas/2-story-module';
 import { loadTaxonomyGame } from '$lib/server/taxonomy-game';
+import type { AnimationTexts, WebMotionConfig } from '$lib/media/animation';
 import { error } from '@sveltejs/kit';
 import { sql, type NotNull } from 'kysely';
 import { jsonArrayFrom, jsonObjectFrom } from 'kysely/helpers/postgres';
 import z from 'zod/v4';
 import { Language, selectLocalizedField, selectLocalizedMediaField } from '../schemas/0-utils';
+
+// Read JSON as text so CamelCasePlugin does not rename user-defined variable or motion keys.
+export const animationSelection = [
+	'animation.id',
+	'animation.name',
+	sql<string>`animation.configuration::text`.as('configuration'),
+	sql<string>`animation.texts::text`.as('texts')
+] as const;
+
+export const parseAnimation = <
+	T extends {
+		configuration: string;
+		texts: string;
+	}
+>(
+	animation: T
+) => {
+	const { configuration: rawConfiguration, texts, ...rest } = animation;
+	const configuration = JSON.parse(rawConfiguration) as WebMotionConfig;
+	return {
+		...rest,
+		configuration,
+		duration: configuration.composition.durationInFrames / configuration.composition.fps,
+		texts: JSON.parse(texts) as AnimationTexts
+	};
+};
 
 export const storySchema = z.object({
 	slug: z.string().min(1),
@@ -41,7 +68,10 @@ export const findOneAnthologyBySlug = async (
 		.select((eb) => [
 			'anthology.id',
 			'anthology.slug',
+			'anthology.order',
 			'anthology.visualization',
+			selectLocalizedMediaField(eb, 'anthology.thumbnail', language).as('thumbnail'),
+			selectLocalizedField(eb, 'anthology.description', language).as('description'),
 			selectLocalizedField(eb, 'anthology.name', language).as('name'),
 			jsonArrayFrom(
 				eb
@@ -63,6 +93,33 @@ export const findOneAnthologyBySlug = async (
 
 	return anthology;
 };
+
+export const findManyPublicAnthologies = async (clientId: string, language?: Language) =>
+	db
+		.selectFrom('anthology')
+		.where('anthology.clientId', '=', clientId)
+		.where('anthology.isPublished', '=', true)
+		.where('anthology.isPublic', '=', true)
+		.select((eb) => [
+			'anthology.id',
+			'anthology.slug',
+			'anthology.order',
+			'anthology.visualization',
+			selectLocalizedMediaField(eb, 'anthology.thumbnail', language).as('thumbnail'),
+			selectLocalizedField(eb, 'anthology.description', language).as('description'),
+			selectLocalizedField(eb, 'anthology.name', language).as('name'),
+			eb
+				.selectFrom('anthologyPosition')
+				.innerJoin('story', 'story.id', 'anthologyPosition.storyId')
+				.whereRef('anthologyPosition.anthologyId', '=', 'anthology.id')
+				.where('story.isPublished', '=', true)
+				.where('story.isPublic', '=', true)
+				.select(sql<number>`count(*)::integer`.as('storyCount'))
+				.as('storyCount')
+		])
+		.orderBy(sql`anthology."order" asc nulls last`)
+		.orderBy('anthology.updatedAt', 'desc')
+		.execute();
 
 export const findOneStoryById = async (clientId: string, storyId: string, language?: Language) => {
 	if (!clientId.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i))
@@ -103,6 +160,18 @@ export const findOneStoryById = async (clientId: string, storyId: string, langua
 						'video.duration'
 					])
 			).as('videos'),
+
+			jsonArrayFrom(
+				eb
+					.selectFrom('animation')
+					.innerJoin(
+						'animationAvailableToStory',
+						'animationAvailableToStory.animationId',
+						'animation.id'
+					)
+					.whereRef('animationAvailableToStory.storyId', '=', 'story.id')
+					.select(animationSelection)
+			).as('animations'),
 
 			jsonArrayFrom(
 				eb
@@ -224,6 +293,7 @@ export const findOneStoryById = async (clientId: string, storyId: string, langua
 						'part.backgroundConfiguration',
 						'part.stillId',
 						'part.videoId',
+						'part.animationId',
 						'part.defaultNextPartId',
 
 						// Foreground
@@ -327,7 +397,12 @@ export const findOneStoryById = async (clientId: string, storyId: string, langua
 											.selectFrom('attribute')
 											.whereRef('attribute.taxonomyId', '=', 'taxonomyDraftForPart.taxonomyId')
 											.orderBy('attribute.slug')
-											.select(['attribute.id', 'attribute.slug', 'attribute.name'])
+											.select([
+												'attribute.id',
+												'attribute.slug',
+												'attribute.name',
+												'attribute.question'
+											])
 									).as('attributeOptions'),
 									jsonArrayFrom(
 										eb
@@ -396,7 +471,7 @@ export const findOneStoryById = async (clientId: string, storyId: string, langua
 		])
 		.executeTakeFirstOrThrow();
 
-	return rawstory;
+	return { ...rawstory, animations: rawstory.animations.map(parseAnimation) };
 };
 
 export const findOneStoryBySlug = async (
@@ -454,6 +529,21 @@ export const findOneStoryBySlug = async (
 										.selectFrom('still')
 										.whereRef('still.id', '=', 'part.stillId')
 										.select(['still.color', 'still.image', 'still.style'])
+								)
+							)
+							.when('part.backgroundType', '=', 'animation')
+							.then(
+								jsonObjectFrom(
+									eb
+										.selectFrom('animation')
+										.innerJoin(
+											'animationAvailableToStory',
+											'animationAvailableToStory.animationId',
+											'animation.id'
+										)
+										.whereRef('animationAvailableToStory.storyId', '=', 'part.storyId')
+										.whereRef('animation.id', '=', 'part.animationId')
+										.select(animationSelection)
 								)
 							)
 							.else(null)
@@ -648,12 +738,14 @@ export const findOneStoryBySlug = async (
 		thumbnail: rawstory.thumbnail,
 		parts: rawstory.parts.map((part) => {
 			const {
-				background,
+				background: rawBackground,
 				backgroundConfiguration,
 				foreground,
 				foregroundConfiguration,
 				...restPart
 			} = part;
+			const background =
+				rawBackground && 'texts' in rawBackground ? parseAnimation(rawBackground) : rawBackground;
 			const taxonomyGame = taxonomyGames.get(part.id);
 			if (part.foregroundType === 'taxonomy' && taxonomyGame) {
 				return {
@@ -763,6 +855,7 @@ export const findOnePartById = async (partId: string, language?: Language) => {
 			'part.backgroundConfiguration',
 			'part.stillId',
 			'part.videoId',
+			'part.animationId',
 			'part.defaultNextPartId',
 
 			// Foreground
@@ -857,7 +950,7 @@ export const findOnePartById = async (partId: string, language?: Language) => {
 								.selectFrom('attribute')
 								.whereRef('attribute.taxonomyId', '=', 'taxonomyDraftForPart.taxonomyId')
 								.orderBy('attribute.slug')
-								.select(['attribute.id', 'attribute.slug', 'attribute.name'])
+								.select(['attribute.id', 'attribute.slug', 'attribute.name', 'attribute.question'])
 						).as('attributeOptions'),
 						jsonArrayFrom(
 							eb
@@ -941,6 +1034,17 @@ export const findOneVideoById = async (videoId: string) => {
 		.executeTakeFirstOrThrow();
 
 	return announcement;
+};
+
+export const findOneAnimationById = async (storyId: string, animationId: string) => {
+	const animation = await db
+		.selectFrom('animation')
+		.innerJoin('animationAvailableToStory', 'animationAvailableToStory.animationId', 'animation.id')
+		.where('animationAvailableToStory.storyId', '=', storyId)
+		.where('animation.id', '=', animationId)
+		.select(animationSelection)
+		.executeTakeFirstOrThrow();
+	return parseAnimation(animation);
 };
 
 export const findOneStillById = async (stillId: string) => {

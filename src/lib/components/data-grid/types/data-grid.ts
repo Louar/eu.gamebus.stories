@@ -26,6 +26,7 @@ export type RowHeightValue = DataGridRowHeight;
 export interface CellSelectOption {
 	title: string;
 	summary?: string | null;
+	details?: string | null;
 	value: string;
 	icon?: Component;
 	count?: number;
@@ -60,11 +61,19 @@ export type CellOpts<TData = unknown> =
 	  }
 	| { variant: 'badge-item'; url?: string }
 	| { variant: 'relation-follow'; url?: string; icon?: Component }
-	| { variant: 'relation-select-single'; options: CellSelectOption[] }
+	| {
+			variant: 'relation-select-single';
+			options: CellSelectOption[];
+			presentation?: 'default' | 'detailed';
+	  }
 	| { variant: 'input-with-suggestions'; options: CellSelectOption[] }
 	| { variant: 'number'; min?: number; max?: number; step?: number }
 	| { variant: 'select-icon' }
-	| { variant: 'select-single'; options: CellSelectOption[] }
+	| {
+			variant: 'select-single';
+			options: CellSelectOption[];
+			presentation?: 'default' | 'detailed';
+	  }
 	| { variant: 'select-multiple'; options: CellSelectOption[] }
 	| { variant: 'checkbox' }
 	| { variant: 'date' }
@@ -76,7 +85,7 @@ export type CellOpts<TData = unknown> =
 			actions: DataGridCellAction<TData>[] | ((row: TData) => DataGridCellAction<TData>[]);
 	  }
 	| {
-			variant: 'file' | 'file-or-url';
+			variant: 'file' | 'file-or-url' | 'file-with-library-or-url';
 			maxFileSize?: number;
 			maxFiles?: number;
 			accept?: string;
@@ -125,6 +134,10 @@ export interface DataGridMutationContext<TData> {
 	rowId: string;
 }
 
+export interface DataGridDeleteContext<TData> extends DataGridMutationContext<TData> {
+	force: boolean;
+}
+
 export interface DataGridDuplicateContext<TData> extends DataGridMutationContext<TData> {
 	targetId?: string;
 }
@@ -142,7 +155,7 @@ export interface DataGridDataAdapter<TData> {
 	/** Duplicates one persisted row, including any owned child relations. */
 	duplicate?: (params: DataGridDuplicateContext<TData>) => Promise<TData>;
 	update?: (params: DataGridMutationContext<TData> & { changes: Partial<TData> }) => Promise<TData>;
-	delete?: (params: DataGridMutationContext<TData>) => Promise<boolean>;
+	delete?: (params: DataGridDeleteContext<TData>) => Promise<boolean>;
 	download?: (params: { rows: TData[]; rowIds: string[] }) => Promise<void>;
 }
 
@@ -161,6 +174,16 @@ export interface DataGridDeleteDialogState {
 	open: boolean;
 	rowCount: number;
 	isDeleting: boolean;
+	force: boolean;
+}
+
+export interface DataGridDeleteConfirmationOptions {
+	itemLabel?: { singular: string; plural: string };
+	description?: string | ((rowCount: number) => string);
+	force?: {
+		label: string;
+		description?: string;
+	};
 }
 
 export interface DataGridPreferencesController {
@@ -408,6 +431,7 @@ declare module '@tanstack/table-core' {
 		searchMatchSet?: SvelteSet<string>;
 		activeSearchMatch?: CellPosition | null;
 		rowHeight?: RowHeightValue;
+		cardColumnIds?: readonly string[] | null;
 		rowHeightRemeasureVersion?: number;
 		preferences?: DataGridPreferencesController;
 		onRowHeightChange?: (value: RowHeightValue) => void;
@@ -418,8 +442,10 @@ declare module '@tanstack/table-core' {
 			expectedSnapshots?: ReadonlyMap<string, { generation: number; value: unknown }>
 		) => Promise<DataGridMutationResult[]>;
 		deleteDialog?: DataGridDeleteDialogState;
+		deleteConfirmation?: DataGridDeleteConfirmationOptions;
 		onRowsDeleteRequest?: (rowIndices: number[]) => void;
 		onDeleteDialogOpenChange?: (open: boolean) => void;
+		onDeleteDialogForceChange?: (force: boolean) => void;
 		onRowsDeleteConfirm?: () => Promise<void>;
 		onRowsDuplicate?: (targetId?: string) => Promise<DataGridCreateResult<TData> | void>;
 		getRowDuplicateTargets?: () => readonly DataGridDuplicateTarget[];
@@ -484,6 +510,9 @@ export const ROW_HEIGHT_VALUES: Record<RowHeightValue, number> = ROW_HEIGHTS;
 export type DataGridProps<TData extends RowData> =
 	import('$lib/hooks/use-custom-data-grid.svelte.js').UseDataGridReturn<TData> &
 		DataGridStatusProps & {
+			display?: 'table' | 'grid';
+			card?: Snippet<[TData, Snippet]>;
+			cardFields?: readonly string[];
 			height?: number;
 			class?: string;
 		};

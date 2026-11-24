@@ -187,13 +187,16 @@ classDiagram
   class AnthologyVisualization {
       <<enumeration>>
       GRID
+      GRID_WITH_EXPLANATION
       FEED
+      FEED_WITH_EXPLANATION
   }
 
   class PartBackgroundType {
       <<enumeration>>
       STILL
       VIDEO
+      ANIMATION
   }
 
   class PartForegroundType {
@@ -212,6 +215,9 @@ classDiagram
   class Anthology {
       slug: string
       name: Translatable
+      order: number?
+      thumbnail: TranslatableMedia?
+      description: Translatable?
       visualization: AnthologyVisualization
       configuration: jsonb?
       isPublished: boolean
@@ -276,6 +282,13 @@ classDiagram
       thumbnail: TranslatableMedia?
       captions: TranslatableMedia?
       duration: number
+  }
+
+  class Animation {
+      name: string
+      configuration: jsonb?
+      texts: jsonb?
+      duration: number?
   }
 
   class AnnouncementTemplate {
@@ -369,11 +382,13 @@ classDiagram
   Part "*" -- "0..1" Part: defaultNextPart
   Part "*" -- "0..1" Still
   Part "*" -- "0..1" Video
+  Part "*" -- "0..1" Animation
   Part "*" -- "0..1" AnnouncementTemplate
   Part "*" -- "0..1" QuizLogicForPart
 
   Story "*" -- "*" Still: StillAvailableToStory
   Story "*" -- "*" Video: VideoAvailableToStory
+  Story "*" -- "*" Animation: AnimationAvailableToStory
   Story "*" -- "*" AnnouncementTemplate: AnnouncementTemplateAvailableToStory
   Story "*" -- "*" QuizTemplate: QuizTemplateAvailableToStory
 
@@ -443,6 +458,7 @@ classDiagram
       name: Translatable
       image: Media?
       description: Translatable?
+      question: Translatable?
       type: AttributeType
       schema: json?
   }

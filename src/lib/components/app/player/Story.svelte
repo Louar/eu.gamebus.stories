@@ -19,6 +19,7 @@
 	import AnnouncementOverlay from './AnnouncementOverlay.svelte';
 	import InteractionOverlay from './InteractionOverlay.svelte';
 	import PlayerComponent from './Player.svelte';
+	import AnimationPlayer from './AnimationPlayer.svelte';
 	import TaxonomyGame from './taxonomy/Game.svelte';
 	import type { GamePerformance } from './taxonomy/types';
 	import type { InputFromLogic, Logic, OutputFromLogic, Player, Rule } from './types.js';
@@ -51,11 +52,48 @@
 	let isEnded = $state(false);
 	let isCompleted = $state(false);
 	let visit = $state(0);
+	let activityTemplate = $state('watchStory');
+	let taxonomyWatchDurationMs = $state(0);
+	const legacyEmbedOrigins = new Set(['https://healthyw8.gamebus.eu', 'http://localhost:8100']);
+	const getEmbeddingOrigin = () => {
+		try {
+			return new URL(document.referrer).origin;
+		} catch {
+			return undefined;
+		}
+	};
+	const usesLegacyEmbedProtocol = () => {
+		const origin = getEmbeddingOrigin();
+		return origin !== undefined && legacyEmbedOrigins.has(origin);
+	};
 
 	onMount(() => {
 		initPlayerEvents(story.id);
 		pid = story?.parts?.[0]?.id;
 		start = new Date().getTime();
+
+		if (window.parent !== window && !usesLegacyEmbedProtocol()) {
+			const embeddingOrigin = getEmbeddingOrigin();
+			const handleMessage = (event: MessageEvent<unknown>) => {
+				if (event.source !== window.parent) return;
+				if (embeddingOrigin && event.origin !== embeddingOrigin) return;
+				if (!event.data || typeof event.data !== 'object') return;
+
+				const message = event.data as {
+					type?: unknown;
+					data?: { activityTemplates?: Array<{ slug?: unknown }> };
+				};
+				if (message.type !== 'TASK') return;
+
+				const slug = message.data?.activityTemplates?.[0]?.slug;
+				if (typeof slug === 'string' && slug.length > 0) activityTemplate = slug;
+			};
+
+			window.addEventListener('message', handleMessage);
+			window.parent.postMessage({ type: 'IFRAME_READY' }, '*');
+
+			return () => window.removeEventListener('message', handleMessage);
+		}
 	});
 
 	const restart = () => {
@@ -139,6 +177,8 @@
 		logic: TaxonomyLogic,
 		performance: GamePerformance
 	) => {
+		if (!canNavigate(partId, expectedVisit)) return;
+		taxonomyWatchDurationMs += performance.duration;
 		const matchesRange = (value: number, range: [number | null, number | null] | null) =>
 			range === null ||
 			((range[0] === null || value >= range[0]) && (range[1] === null || value <= range[1]));
@@ -160,7 +200,8 @@
 
 	const end = (completed = true) => {
 		if (isEnded || !isActiveStory) return;
-		const watchTime = Math.round(Object.values(PLAYERS.watchDurations)?.reduce((a, b) => a + b, 0));
+		const playerWatchDuration = Object.values(PLAYERS.watchDurations).reduce((a, b) => a + b, 0);
+		const watchTime = Math.round(playerWatchDuration + taxonomyWatchDurationMs / 1000);
 		const percentages = Object.values(PLAYERS.watchTimePercentages);
 		const watchTimePercentage = percentages.length
 			? Math.round(percentages.reduce((a, b) => a + b, 0) / percentages.length)
@@ -170,17 +211,41 @@
 			STORIES.averageWatchTimePercentages[story.id] ?? 0,
 			watchTimePercentage
 		);
-		parent.postMessage(
-			{
-				isCompleted: completed,
-				start,
-				end: new Date().getTime(),
-				watchTime,
-				watchTimePercentage,
-				events
-			},
-			'*'
-		);
+		if (completed) STORIES.completed[story.id] = true;
+		const endedAt = new Date().getTime();
+		if (window.parent !== window) {
+			if (usesLegacyEmbedProtocol()) {
+				window.parent.postMessage(
+					{
+						isCompleted: completed,
+						start,
+						end: endedAt,
+						watchTime,
+						watchTimePercentage,
+						events
+					},
+					'*'
+				);
+			} else {
+				window.parent.postMessage(
+					{
+						type: 'ACTIVITY',
+						data: {
+							template: activityTemplate,
+							start: new Date(start ?? endedAt).toISOString(),
+							end: new Date(endedAt).toISOString(),
+							properties: [
+								{
+									template: 'duration',
+									obj: { value: watchTime, unit: 'seconds' }
+								}
+							]
+						}
+					},
+					'*'
+				);
+			}
+		}
 		isCompleted = completed;
 		isEnded = true;
 		if (completed && onnext) onnext();
@@ -238,21 +303,30 @@
 	};
 
 	const cueTolerance = 0.02;
+	const getDuration = (part: StoryPart) => {
+		if (
+			(part.backgroundType === 'video' || part.backgroundType === 'animation') &&
+			part.background &&
+			'duration' in part.background
+		)
+			return part.background.duration;
+	};
 
 	const getOverlayStart = (part: StoryPart, player: Player | undefined) => {
-		if (part.backgroundType !== 'video') return undefined;
-		if (!part.background || !('duration' in part.background)) return undefined;
+		const duration = getDuration(part);
+		if (duration === undefined) return undefined;
 		if (!part.foreground) return undefined;
 
 		const clipStart = player?.start ?? 0;
-		const clipEnd = Math.min(player?.end ?? part.background.duration, part.background.duration);
-		const cue = (part.foreground.start ?? 0) * part.background.duration - clipStart;
+		const clipEnd = Math.min(player?.end ?? duration, duration);
+		const cue = (part.foreground.start ?? 0) * duration - clipStart;
 
 		return Math.min(Math.max(cue, 0), Math.max(0, clipEnd - clipStart));
 	};
 
 	const hasOverlay = (part: StoryPart, player: Player | undefined) => {
-		if (part.backgroundType !== 'video') return Boolean(part.foreground);
+		if (part.backgroundType !== 'video' && part.backgroundType !== 'animation')
+			return Boolean(part.foreground);
 		const overlayStart = getOverlayStart(part, player);
 		return (
 			PLAYERS.didUserInteract &&
@@ -301,10 +375,10 @@
 	};
 
 	const updatePlayerTimeToPartEnd = (part: StoryPart, player: Player) => {
-		if (part.backgroundType !== 'video') return;
-		if (!part.background || !('duration' in part.background)) return;
+		const duration = getDuration(part);
+		if (duration === undefined) return;
 
-		const partEnd = Math.min(player.end ?? part.background.duration, part.background.duration);
+		const partEnd = Math.min(player.end ?? duration, duration);
 		player.time = Math.max(player.time ?? 0, partEnd - (player.start ?? 0));
 	};
 
@@ -342,8 +416,20 @@
 	$effect(() => {
 		if (!pid || isEnded || !isActiveStory) return;
 		const activePart = story.parts.find((part) => part.id === pid);
-		if (!activePart || activePart.terminationStrategy === PartTerminationStrategy.none) return;
-		if (activePart.backgroundType === 'video') return;
+		if (!activePart) return;
+		if (activePart.backgroundType === 'video' || activePart.backgroundType === 'animation') return;
+		if (
+			activePart.backgroundType === 'still' &&
+			(!activePart.foregroundType || activePart.foregroundType === 'announcement')
+		) {
+			const duration = activePart.background?.duration;
+			if (typeof duration === 'number' && Number.isFinite(duration) && duration >= 0) {
+				const expectedVisit = visit;
+				const timer = setTimeout(() => finishPart(activePart.id, expectedVisit), duration * 1000);
+				return () => clearTimeout(timer);
+			}
+		}
+		if (activePart.terminationStrategy === PartTerminationStrategy.none) return;
 		finishPart(activePart.id, visit);
 	});
 
@@ -391,6 +477,17 @@
 							? `url("${mediaUrl(background.image)}")`
 							: undefined}
 					></div>
+				{:else if part?.backgroundType === 'animation' && player?.animation}
+					<AnimationPlayer
+						config={player.animation}
+						duration={getDuration(part)!}
+						bind:player={players[players.indexOf(player)]}
+						isActive={isActiveStory && part.id === pid && !isEnded}
+						{overlayStart}
+						pauseAtOverlay={shouldPauseAtOverlay(part)}
+						onoverlaystart={() => handleOverlayStart(part, player, activeVisit)}
+						onended={() => finishPart(part.id, activeVisit)}
+					/>
 				{:else if part?.backgroundType === 'video' && player?.source}
 					{@const nextPlayers =
 						part.terminationStrategy === PartTerminationStrategy.none
@@ -425,7 +522,7 @@
 						bind:doEnd={player.doEnd}
 						bind:time={player.time}
 						isOverlaid={hasOverlay(part, player)}
-						overlayStart={overlayStart}
+						{overlayStart}
 						pauseAtOverlay={shouldPauseAtOverlay(part)}
 						bufferNext={() => {
 							if (nextPlayers?.length) {

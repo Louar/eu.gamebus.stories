@@ -9,6 +9,7 @@ import { jsonArrayFrom } from 'kysely/helpers/postgres';
 import YAML from 'yaml';
 import type { RequestHandler } from './$types';
 import { schema } from './schemas';
+import { serializeStoryForIo } from '../../../stories/[[storyId]]/io/story-io';
 
 const parseBody = async (request: Request) => {
 	const body = await request.text();
@@ -45,6 +46,9 @@ const findOneAnthologyById = async (clientId: string, anthologyId: string) =>
 			'anthology.id',
 			'anthology.slug',
 			'anthology.name',
+			'anthology.order',
+			'anthology.thumbnail',
+			'anthology.description',
 			'anthology.visualization',
 			'anthology.configuration',
 			'anthology.isPublished',
@@ -93,10 +97,19 @@ export const GET = (async ({ locals, params, url }) => {
 	const storyIds = [...new Set(positions.map((position) => position.storyId))];
 	const yaml = YAML.stringify({
 		...restAnthology,
-		positions: positions.map(({ storyId: _storyId, ...position }) => position),
+		positions: positions.map(({ id, order, storySlug, configuration }) => ({
+			id,
+			order,
+			storySlug,
+			configuration
+		})),
 		...(includeStories
 			? {
-					stories: await Promise.all(storyIds.map((storyId) => findOneStoryById(clientId, storyId)))
+					stories: await Promise.all(
+						storyIds.map(async (storyId) =>
+							serializeStoryForIo(await findOneStoryById(clientId, storyId))
+						)
+					)
 				}
 			: {})
 	});
@@ -186,6 +199,9 @@ export const POST = (async ({ locals, request, fetch }) => {
 				clientId,
 				slug: anthologySlug,
 				name: JSON.stringify(anthologyRaw.name),
+				order: anthologyRaw.order,
+				thumbnail: anthologyRaw.thumbnail ? JSON.stringify(anthologyRaw.thumbnail) : null,
+				description: anthologyRaw.description ? JSON.stringify(anthologyRaw.description) : null,
 				visualization: anthologyRaw.visualization,
 				configuration: anthologyRaw.configuration
 					? JSON.stringify(anthologyRaw.configuration)

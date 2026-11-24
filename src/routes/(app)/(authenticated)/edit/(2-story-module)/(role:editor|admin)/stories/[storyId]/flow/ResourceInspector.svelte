@@ -1,6 +1,7 @@
 <script lang="ts" module>
 	export type EditorSelection =
 		| { kind: 'still'; id?: string }
+		| { kind: 'animation'; id?: string }
 		| { kind: 'video'; id?: string }
 		| { kind: 'video-library' }
 		| { kind: 'announcement'; id?: string }
@@ -24,6 +25,7 @@
 		findOneVideoById
 	} from '$lib/db/repositories/2-story-module.js';
 	import AnnouncementEditor from './AnnouncementEditor.svelte';
+	import AnimationEditor, { type AnimationEditorOutput } from './AnimationEditor.svelte';
 	import QuizEditor from './QuizEditor.svelte';
 	import StillEditor from './StillEditor.svelte';
 	import TaxonomyLogicEditor from './TaxonomyLogicEditor.svelte';
@@ -38,6 +40,7 @@
 		selection = $bindable(null),
 		open = $bindable(false),
 		closeStill,
+		closeAnimation,
 		closeVideo,
 		addVideo,
 		closeAnnouncement,
@@ -47,6 +50,7 @@
 		story: Story;
 		selection?: EditorSelection;
 		open?: boolean;
+		closeAnimation: (output: AnimationEditorOutput, selection: EditorSelection) => void;
 		closeStill: (output: {
 			action: 'persist' | 'delete' | 'close';
 			id?: string;
@@ -76,6 +80,9 @@
 	} = $props();
 
 	const sidebar = useSidebar();
+	// Capture the opening selection so late saves cannot replace another resource's editor.
+	const animationCallback = (current: EditorSelection) => (output: AnimationEditorOutput) =>
+		closeAnimation(output, current);
 	let taxonomyPart = $derived.by(() => {
 		const current = selection;
 		if (current?.kind !== 'taxonomy') return undefined;
@@ -101,11 +108,17 @@
 			<XIcon />
 		</Button> -->
 		{#if selection}
-			{#key selection.kind === 'taxonomy' ? `${selection.kind}-${selection.partId}` : selection.kind === 'video-library' ? selection.kind : `${selection.kind}-${selection.id ?? 'new'}`}
+			{#key selection.kind === 'animation' ? selection : selection.kind === 'taxonomy' ? `${selection.kind}-${selection.partId}` : selection.kind === 'video-library' ? selection.kind : `${selection.kind}-${selection.id ?? 'new'}`}
 				{#if selection.kind === 'still'}
 					<StillEditor storyId={story.id} selectedId={selection.id} close={closeStill} />
 				{:else if selection.kind === 'video'}
 					<VideoEditor storyId={story.id} selectedId={selection.id} close={closeVideo} />
+				{:else if selection.kind === 'animation'}
+					<AnimationEditor
+						storyId={story.id}
+						selectedId={selection.id}
+						close={animationCallback(selection)}
+					/>
 				{:else if selection.kind === 'video-library'}
 					<VideoLibrary
 						storyId={story.id}
@@ -135,7 +148,12 @@
 
 {#if sidebar.isMobile}
 	<Sheet.Root bind:open>
-		<Sheet.Content side="left" class="w-[min(100vw,32rem)] max-w-none p-0 [&>button]:hidden">
+		<Sheet.Content
+			side="left"
+			class={selection?.kind === 'animation'
+				? 'w-screen max-w-none min-w-0 p-0 sm:max-w-none [&>button]:hidden'
+				: 'w-[min(100vw,32rem)] max-w-none p-0 [&>button]:hidden'}
+		>
 			<Sheet.Header class="sr-only">
 				<Sheet.Title>Resource editor</Sheet.Title>
 				<Sheet.Description>Edit the selected story resource.</Sheet.Description>
@@ -145,7 +163,10 @@
 	</Sheet.Root>
 {:else if open && selection}
 	<aside
-		class="fixed inset-y-0 inset-s-(--sidebar-width) z-50 h-svh w-120 border-r bg-background shadow-sm peer-data-[collapsible=offcanvas]:inset-s-0"
+		class="fixed inset-y-0 inset-s-(--sidebar-width) z-50 h-svh border-r bg-background shadow-sm peer-data-[collapsible=offcanvas]:inset-s-0 {selection.kind ===
+		'animation'
+			? 'w-[48rem] max-w-[calc(100vw-var(--sidebar-width))] min-w-0 peer-data-[collapsible=offcanvas]:max-w-[100vw]'
+			: 'w-120'}"
 	>
 		{@render inspector()}
 	</aside>

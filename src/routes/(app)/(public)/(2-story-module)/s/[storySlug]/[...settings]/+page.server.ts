@@ -1,5 +1,6 @@
 import { findOneStoryBySlug } from '$lib/db/repositories/2-story-module';
 import { Language, MediaCollection } from '$lib/db/schemas/0-utils';
+import { resolveAnimationConfig } from '$lib/media/animation';
 import { getRoundedVideoTime, getYouTubeEmbedUrl } from '$lib/media/video';
 import { cookieName, isLocale } from '$lib/paraglide/runtime';
 import { error } from '@sveltejs/kit';
@@ -8,13 +9,28 @@ import type { PageServerLoad } from './$types';
 export const load: PageServerLoad = async ({ cookies, locals, params }) => {
 	const clientId = locals.client.id;
 
+	const settings = params.settings?.toLowerCase()?.split('/');
+
 	const clientLocales = locals.client.locales.filter(isLocale);
-	const defaultLanguage = clientLocales[0] ?? Language.English;
-	const cookieLanguage = cookies.get(cookieName);
-	const language =
-		cookieLanguage && isLocale(cookieLanguage) && clientLocales.includes(cookieLanguage as Language)
-			? (cookieLanguage as Language)
-			: defaultLanguage;
+	const validLanguages = new Set<string>(Object.values(Language));
+	const configuredLanguage = settings.find(value => validLanguages.has(value));
+
+	let language: Language = clientLocales[0] ?? Language.English;
+	if (
+		configuredLanguage && isLocale(configuredLanguage)
+		// && clientLocales.includes(configuredLanguage as Language)
+	) {
+		language = configuredLanguage as Language;
+	} else {
+		const cookieLanguage = cookies.get(cookieName);
+
+		if (
+			cookieLanguage && isLocale(cookieLanguage)
+			// && clientLocales.includes(cookieLanguage as Language)
+		) {
+			language = cookieLanguage as Language;
+		}
+	}
 
 	const story = await findOneStoryBySlug(clientId, params.storySlug, language);
 	if (!story)
@@ -32,16 +48,20 @@ export const load: PageServerLoad = async ({ cookies, locals, params }) => {
 		const end = getRoundedVideoTime(background?.end, background?.duration);
 		return {
 			id: part.id,
+			animation:
+				part.backgroundType === 'animation' && part.background && 'configuration' in part.background
+					? resolveAnimationConfig(part.background, language)
+					: undefined,
 			source:
 				background?.source?.collection === MediaCollection.externals
 					? {
-							...background.source,
-							filename: getYouTubeEmbedUrl(background.source.filename, {
-								start: background.start,
-								end: background.end,
-								duration: background.duration
-							})
-						}
+						...background.source,
+						filename: getYouTubeEmbedUrl(background.source.filename, {
+							start: background.start,
+							end: background.end,
+							duration: background.duration
+						})
+					}
 					: background?.source,
 			thumbnail: background?.thumbnail ?? undefined,
 			captions: background?.captions ?? undefined,

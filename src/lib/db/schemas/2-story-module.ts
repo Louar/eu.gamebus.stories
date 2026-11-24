@@ -1,4 +1,5 @@
 import type { ColumnType, Generated, JSONColumnType } from 'kysely';
+import type { AnimationTexts, WebMotionConfig } from '$lib/media/animation';
 import type { MediaColumn, TranslatableColumn, TranslatableMediaColumn } from './0-utils';
 
 export const LogicHitpolicy = {
@@ -16,7 +17,9 @@ export type AnthologyPermissionRole =
 
 export const AnthologyVisualization = {
 	grid: 'GRID',
-	feed: 'FEED'
+	gridWithExplanation: 'GRID_WITH_EXPLANATION',
+	feed: 'FEED',
+	feedWithExplanation: 'FEED_WITH_EXPLANATION'
 } as const;
 export type AnthologyVisualization =
 	(typeof AnthologyVisualization)[keyof typeof AnthologyVisualization];
@@ -30,6 +33,7 @@ export type StoryPermissionRole = (typeof StoryPermissionRole)[keyof typeof Stor
 
 export const PartBackgroundType = {
 	still: 'still',
+	animation: 'animation',
 	video: 'video'
 } as const;
 export type PartBackgroundType = (typeof PartBackgroundType)[keyof typeof PartBackgroundType];
@@ -70,6 +74,8 @@ export type StoryModuleSchema = {
 	stillAvailableToStory: StillAvailableToStory;
 	video: Video;
 	videoAvailableToStory: VideoAvailableToStory;
+	animation: Animation;
+	animationAvailableToStory: AnimationAvailableToStory;
 	announcementTemplate: AnnouncementTemplate;
 	announcementTemplateAvailableToStory: AnnouncementTemplateAvailableToStory;
 	quizTemplate: QuizTemplate;
@@ -105,6 +111,9 @@ type Anthology = {
 	clientId: string;
 	slug: string;
 	name: TranslatableColumn;
+	order: number | null;
+	thumbnail: TranslatableMediaColumn | null;
+	description: TranslatableColumn | null;
 	visualization: ColumnType<
 		AnthologyVisualization,
 		AnthologyVisualization | null | undefined,
@@ -181,6 +190,7 @@ type Part = {
 	storyId: string;
 	backgroundType: string | null;
 	backgroundConfiguration: JSONColumnType<{
+		duration?: number;
 		start?: number;
 		end?: number;
 		[x: string]: unknown;
@@ -200,6 +210,7 @@ type Part = {
 	defaultNextPartId: string | null;
 	stillId: string | null;
 	videoId: string | null;
+	animationId: string | null;
 	announcementTemplateId: string | null;
 	quizLogicForPartId: string | null;
 	taxonomyDraftForPartId: string | null;
@@ -230,6 +241,18 @@ type VideoAvailableToStory = {
 	id: Generated<string>;
 	storyId: string;
 	videoId: string;
+};
+
+type Animation = {
+	id: Generated<string>;
+	name: string;
+	configuration: JSONColumnType<WebMotionConfig> | null;
+	texts: JSONColumnType<AnimationTexts> | null;
+};
+type AnimationAvailableToStory = {
+	id: Generated<string>;
+	storyId: string;
+	animationId: string;
 };
 
 type AnnouncementTemplate = {
@@ -351,6 +374,7 @@ type Attribute = {
 	name: TranslatableColumn;
 	image: MediaColumn | null;
 	description: TranslatableColumn | null;
+	question: TranslatableColumn | null;
 	type: AttributeType;
 	referencedCategoryId: string | null;
 	schema: JSONColumnType<Record<string, unknown>> | null;

@@ -1,11 +1,12 @@
 import { db } from '$lib/db/database';
 import { findOneStoryById } from '$lib/db/repositories/2-story-module';
 import { PartTerminationStrategy } from '$lib/db/schemas/2-story-module';
-import { requireParam } from '$lib/server/utils.server';
+import { canModifyStory, requireParam } from '$lib/server/utils.server';
 import { error, json } from '@sveltejs/kit';
 import YAML from 'yaml';
 import type { RequestHandler } from './$types';
 import { schema } from './schemas';
+import { serializeStoryForIo } from './story-io';
 
 const parseBody = async (request: Request) => {
 	const body = await request.text();
@@ -32,8 +33,9 @@ const canHaveOutgoingConnections = (terminationStrategy: PartTerminationStrategy
 export const GET = (async ({ locals, params }) => {
 	const clientId = locals.client.id;
 	const storyId = requireParam(params.storyId, 'The story path parameter is required');
+	await canModifyStory(locals, storyId);
 
-	const story = await findOneStoryById(clientId, storyId);
+	const story = serializeStoryForIo(await findOneStoryById(clientId, storyId));
 
 	const yaml = YAML.stringify(story);
 
@@ -62,6 +64,21 @@ export const POST = (async ({ locals, request }) => {
 	const body = schema.safeParse(rawBody);
 	if (!body.success) return json(body.error.issues, { status: 422 });
 	const story_raw = body.data;
+	const animationIds = new Set(
+		story_raw.animations.map((animation) => animation.id).filter(Boolean)
+	);
+	if (animationIds.size !== story_raw.animations.filter((animation) => animation.id).length) {
+		return json({ message: 'Animation IDs must be unique' }, { status: 422 });
+	}
+	if (
+		story_raw.parts.some(
+			(part) =>
+				(part.animationId && !animationIds.has(part.animationId)) ||
+				(part.backgroundType === 'animation' && !part.animationId)
+		)
+	) {
+		return json({ message: 'A part references a missing animation' }, { status: 422 });
+	}
 	const taxonomySlugs = [
 		...new Set(
 			story_raw.parts
@@ -87,40 +104,20 @@ export const POST = (async ({ locals, request }) => {
 	}
 
 	const attributeSlugsByTaxonomyId = new Map<string, Set<string>>();
-	const attributeSlugByImportedId = new Map<string, string>();
-	const missingDraftedAttributeIds: string[] = [];
 	for (const part_raw of story_raw.parts) {
 		const draft_raw = part_raw.taxonomyDraftForPart;
 		if (!draft_raw) continue;
 
 		const taxonomyId = taxonomyIdBySlug.get(draft_raw.taxonomySlug)!;
-		const attributeSlugById = new Map(
-			(draft_raw.attributeOptions ?? []).map((attribute) => [attribute.id, attribute.slug])
-		);
-		for (const attributeId of draft_raw.draftedAttributeIds ?? []) {
-			const attributeSlug = attributeSlugById.get(attributeId);
-			if (!attributeSlug) {
-				missingDraftedAttributeIds.push(attributeId);
-				continue;
-			}
-
-			attributeSlugByImportedId.set(attributeId, attributeSlug);
+		for (const attributeSlug of draft_raw.draftedAttributeSlugs ?? []) {
 			const attributeSlugs = attributeSlugsByTaxonomyId.get(taxonomyId) ?? new Set<string>();
 			attributeSlugs.add(attributeSlug);
 			attributeSlugsByTaxonomyId.set(taxonomyId, attributeSlugs);
 		}
 	}
-	if (missingDraftedAttributeIds.length) {
-		return json(
-			{
-				message: 'Some drafted attributes are missing from attributeOptions',
-				attributeIds: [...new Set(missingDraftedAttributeIds)]
-			},
-			{ status: 422 }
-		);
-	}
 
 	const attributeIdByTaxonomyIdAndSlug = new Map<string, string>();
+	const missingDraftedAttributeSlugs: string[] = [];
 	for (const [taxonomyId, attributeSlugs] of attributeSlugsByTaxonomyId) {
 		const attributes = attributeSlugs.size
 			? await db
@@ -133,6 +130,21 @@ export const POST = (async ({ locals, request }) => {
 		for (const attribute of attributes) {
 			attributeIdByTaxonomyIdAndSlug.set(`${taxonomyId}:${attribute.slug}`, attribute.id);
 		}
+
+		for (const attributeSlug of attributeSlugs) {
+			if (!attributeIdByTaxonomyIdAndSlug.has(`${taxonomyId}:${attributeSlug}`)) {
+				missingDraftedAttributeSlugs.push(attributeSlug);
+			}
+		}
+	}
+	if (missingDraftedAttributeSlugs.length) {
+		return json(
+			{
+				message: 'Some drafted attributes do not exist',
+				attributeSlugs: [...new Set(missingDraftedAttributeSlugs)]
+			},
+			{ status: 422 }
+		);
 	}
 
 	const storyId = await db.transaction().execute(async (trx) => {
@@ -211,6 +223,24 @@ export const POST = (async ({ locals, request }) => {
 				.values({ storyId: story.id, videoId: video.id })
 				.executeTakeFirstOrThrow();
 			if (video_raw.id?.length) mapOfVideos.set(video_raw.id, video.id);
+		}
+
+		const mapOfAnimations = new Map<string, string>();
+		for (const animation_raw of story_raw.animations) {
+			const animation = await trx
+				.insertInto('animation')
+				.values({
+					name: animation_raw.name,
+					configuration: JSON.stringify(animation_raw.configuration),
+					texts: JSON.stringify(animation_raw.texts)
+				})
+				.returning('id')
+				.executeTakeFirstOrThrow();
+			await trx
+				.insertInto('animationAvailableToStory')
+				.values({ storyId: story.id, animationId: animation.id })
+				.executeTakeFirstOrThrow();
+			if (animation_raw.id) mapOfAnimations.set(animation_raw.id, animation.id);
 		}
 
 		// 3. Announcement templates
@@ -315,6 +345,7 @@ export const POST = (async ({ locals, request }) => {
 					isInitial: part_raw.isInitial,
 					terminationStrategy: part_raw.terminationStrategy,
 					videoId,
+					animationId: part_raw.animationId ? mapOfAnimations.get(part_raw.animationId) : null,
 					stillId,
 					announcementTemplateId,
 					position: JSON.stringify(part_raw.position)
@@ -412,8 +443,7 @@ export const POST = (async ({ locals, request }) => {
 				.executeTakeFirstOrThrow();
 			if (part_raw.id?.length) mapOfPartsWithTaxonomyDraft.set(part_raw.id, draft.id);
 
-			const draftedAttributeIds = (draft_raw.draftedAttributeIds ?? []).map((attributeId) => {
-				const attributeSlug = attributeSlugByImportedId.get(attributeId)!;
+			const draftedAttributeIds = (draft_raw.draftedAttributeSlugs ?? []).map((attributeSlug) => {
 				const draftedAttributeId = attributeIdByTaxonomyIdAndSlug.get(
 					`${taxonomyId}:${attributeSlug}`
 				);

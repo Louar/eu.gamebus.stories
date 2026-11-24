@@ -4,6 +4,7 @@ import {
 	translatableValidator
 } from '$lib/db/schemas/0-utils';
 import { PartTerminationStrategy } from '$lib/db/schemas/2-story-module';
+import { animationSchema } from '$lib/media/animation';
 import z from 'zod/v4';
 
 const videoSchema = z.object({
@@ -32,7 +33,7 @@ const announcementSchema = z.object({
 const answerOptionSchema = z.object({
 	id: z.string().min(1).optional(),
 	order: z.number(),
-	value: z.string(),
+	value: z.union([z.string(), z.number()]),
 	label: translatableValidator
 });
 
@@ -110,7 +111,7 @@ const taxonomyDraftForPartSchema = z.object({
 	maxMistakes: z.number().int().nullable(),
 	difficulty: z.number().int().nullable(),
 	defaultNextPartId: z.string().min(1).nullable(),
-	draftedAttributeIds: z.array(z.string().min(1)).nullish().default([]),
+	draftedAttributeSlugs: z.array(z.string().min(1)).nullish().default([]),
 	attributeOptions: z.array(taxonomyDraftAttributeOptionSchema).nullish().default([]),
 	draftedCategoryIds: z.array(z.string().min(1)).nullish().default([]),
 	draftedItemIds: z.array(z.string().min(1)).nullish().default([]),
@@ -128,6 +129,7 @@ const partSchema = z.object({
 	backgroundType: z.string().min(1).nullable(),
 	backgroundConfiguration: z.record(z.string(), z.unknown()).nullish().default(null),
 	videoId: z.string().min(1).nullable(),
+	animationId: z.string().min(1).nullish().default(null),
 	stillId: z.string().min(1).nullish().default(null),
 	defaultNextPartId: z.string().min(1).nullable(),
 	foregroundType: z.string().min(1).nullable(),
@@ -149,6 +151,7 @@ export const schema = z.object({
 	isPublished: z.boolean(),
 	isPublic: z.boolean(),
 	videos: z.array(videoSchema),
+	animations: z.array(animationSchema.extend({ id: z.string().min(1).optional() })).default([]),
 	stills: z.array(stillSchema).default([]),
 	announcements: z.array(announcementSchema),
 	quizzes: z.array(quizSchema),

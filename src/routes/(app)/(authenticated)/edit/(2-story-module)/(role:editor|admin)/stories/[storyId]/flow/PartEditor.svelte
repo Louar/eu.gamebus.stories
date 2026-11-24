@@ -5,6 +5,7 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import * as Command from '$lib/components/ui/command/index.js';
 	import * as Field from '$lib/components/ui/field/index.js';
+	import { Input } from '$lib/components/ui/input/index.js';
 	import * as Popover from '$lib/components/ui/popover/index.js';
 	import * as Scrubbable from '$lib/components/ui/scrubbable/index.js';
 	import * as Select from '$lib/components/ui/select/index.js';
@@ -23,6 +24,7 @@
 	import { EDITORS } from '$lib/states/editors.svelte.js';
 	import { UI } from '$lib/states/ui.svelte.js';
 	import BanIcon from '@lucide/svelte/icons/ban';
+	import ClapperboardIcon from '@lucide/svelte/icons/clapperboard';
 	import ImageIcon from '@lucide/svelte/icons/image';
 	import LayersIcon from '@lucide/svelte/icons/layers';
 	import MagnetIcon from '@lucide/svelte/icons/magnet';
@@ -103,6 +105,9 @@
 	let announcementItems = $derived(
 		EDITORS.announcements.map((item) => ({ value: item.id, label: item.name }))
 	);
+	let animationItems = $derived(
+		EDITORS.animations.map((item) => ({ value: item.id, label: item.name }))
+	);
 	let quizItems = $derived(
 		EDITORS.quizzes.map((item) => ({
 			value: item.id,
@@ -111,10 +116,17 @@
 		}))
 	);
 	let taxonomyItems = $derived(
-		EDITORS.taxonomies.map((item) => ({ value: item.id, label: item.name?.en ?? item.slug }))
+		EDITORS.taxonomies.map((item) => ({
+			value: item.id,
+			label: item.name?.en ?? item.slug,
+			description: item.slug
+		}))
 	);
 	let quiz = $derived(EDITORS.quizzes.find((item) => item.id === draft.quizTemplateId));
 	let selectedVideo = $derived(EDITORS.videos.find((item) => item.id === draft.videoId));
+	let selectedAnimation = $derived(
+		EDITORS.animations.find((item) => item.id === draft.animationId)
+	);
 	let selectedVideoSource = $derived(
 		translateLocalizedMediaField(selectedVideo?.source, UI.language)
 	);
@@ -122,7 +134,11 @@
 	let selectedVideoSourceType = $derived(
 		selectedVideoUrl ? getVideoSourceType(selectedVideoUrl) : undefined
 	);
-	let selectedVideoDuration = $derived(selectedVideo?.duration ?? videoDurationFromPart(draft));
+	let selectedVideoDuration = $derived(
+		draft.backgroundType === 'animation' && selectedAnimation
+			? selectedAnimation.duration
+			: (selectedVideo?.duration ?? videoDurationFromPart(draft))
+	);
 	let videoScrubberStep = $derived(
 		selectedVideoSourceType === 'youtube' && selectedVideoDuration > 0
 			? 1 / selectedVideoDuration
@@ -131,8 +147,16 @@
 	let videoScrubberKeyboardStep = $derived(
 		selectedVideoSourceType === 'youtube' && selectedVideoDuration > 0 ? videoScrubberStep : 0.0005
 	);
-	let backgroundStart = $derived(configurationValue(draft, 'backgroundConfiguration', 'start', 0));
-	let backgroundEnd = $derived(configurationValue(draft, 'backgroundConfiguration', 'end', 1));
+	let backgroundStart = $derived(
+		draft.backgroundType === 'animation'
+			? 0
+			: configurationValue(draft, 'backgroundConfiguration', 'start', 0)
+	);
+	let backgroundEnd = $derived(
+		draft.backgroundType === 'animation'
+			? 1
+			: configurationValue(draft, 'backgroundConfiguration', 'end', 1)
+	);
 	let foregroundStart = $derived(
 		configurationValue(draft, 'foregroundConfiguration', 'start', 0.5)
 	);
@@ -353,9 +377,14 @@
 	});
 
 	const setBackgroundType = (value: string) => {
-		draft.backgroundType = value === 'still' || value === 'video' ? value : null;
+		draft.backgroundType =
+			value === 'still' || value === 'video' || value === 'animation' ? value : null;
 		if (draft.backgroundType !== 'still') draft.stillId = null;
+		if (draft.backgroundType !== 'still' && draft.backgroundConfiguration) {
+			delete draft.backgroundConfiguration.duration;
+		}
 		if (draft.backgroundType !== 'video') draft.videoId = null;
+		if (draft.backgroundType !== 'animation') draft.animationId = null;
 		scheduleAutosave();
 	};
 
@@ -567,7 +596,9 @@
 	<Field.Set class="grid gap-4 p-4">
 		<Field.Field>
 			<Field.Label>Type</Field.Label>
-			<ButtonGroup.Root class="w-full">
+			<ButtonGroup.Root
+				class="w-full [&_button]:px-2 [&_button]:text-xs [&_svg]:hidden sm:[&_svg]:block"
+			>
 				<Button
 					type="button"
 					variant={!draft.backgroundType ? 'default' : 'outline'}
@@ -588,6 +619,13 @@
 					class="flex-1"
 					aria-pressed={draft.backgroundType === 'video'}
 					onclick={() => setBackgroundType('video')}><VideoIcon />Video</Button
+				>
+				<Button
+					type="button"
+					variant={draft.backgroundType === 'animation' ? 'default' : 'outline'}
+					class="flex-1 text-xs"
+					aria-pressed={draft.backgroundType === 'animation'}
+					onclick={() => setBackgroundType('animation')}><ClapperboardIcon />Animation</Button
 				>
 			</ButtonGroup.Root>
 		</Field.Field>
@@ -622,6 +660,63 @@
 						<PencilIcon />
 					</Button>
 				</div>
+			</Field.Field>
+			<Field.Field>
+				<Field.Label for="still-duration">Duration (seconds)</Field.Label>
+				<Input
+					id="still-duration"
+					type="number"
+					min={0}
+					step="any"
+					value={draft.backgroundConfiguration?.duration ?? ''}
+					oninput={(event) => {
+						const input = event.currentTarget;
+						if (input.value !== '' && !input.validity.valid) return;
+						draft.backgroundConfiguration = {
+							...draft.backgroundConfiguration,
+							duration: input.value === '' ? undefined : input.valueAsNumber
+						} as typeof draft.backgroundConfiguration;
+						scheduleAutosave();
+					}}
+				/>
+				<Field.Description>
+					Advance after this duration when showing an announcement or no foreground. Quizzes and
+					taxonomy games wait for interaction. Leave blank for no timer.
+				</Field.Description>
+			</Field.Field>
+		{:else if draft.backgroundType === 'animation'}
+			<Field.Field>
+				<Field.Label>Animation</Field.Label>
+				<div class="flex gap-2">
+					<div class="min-w-0 flex-1">
+						<ResourceCombobox
+							items={animationItems}
+							value={draft.animationId}
+							placeholder="Select an animation"
+							searchPlaceholder="Search animations..."
+							emptyText="No animations found."
+							onValueChange={(value) => {
+								draft.animationId = value;
+								scheduleAutosave();
+							}}
+						/>
+					</div>
+					<Button
+						type="button"
+						variant="outline"
+						size="icon"
+						class="shrink-0"
+						disabled={!draft.animationId || saveState === 'saving'}
+						aria-label="Edit selected animation"
+						onclick={() =>
+							void openResourceEditor({ kind: 'animation', id: draft.animationId ?? undefined })}
+					>
+						<PencilIcon />
+					</Button>
+				</div>
+				<Field.Description
+					>Playback timing and translated text are configured in the animation editor.</Field.Description
+				>
 			</Field.Field>
 		{:else if draft.backgroundType === 'video'}
 			<Field.Field>
@@ -855,12 +950,12 @@
 			</Field.Field>
 		{/if}
 
-		{#if draft.foregroundType && draft.backgroundType === 'video'}
+		{#if draft.foregroundType && (draft.backgroundType === 'video' || draft.backgroundType === 'animation')}
 			<Field.Field>
 				<div>
 					<Field.Label>Start</Field.Label>
 					<Field.Description class="text-sm">
-						Timestamp <em>after</em> background video started.
+						Timestamp <em>after</em> background {draft.backgroundType} started.
 					</Field.Description>
 				</div>
 				<Scrubbable.Root
@@ -876,11 +971,13 @@
 					<Scrubbable.Label>Timestamp</Scrubbable.Label>
 					<Scrubbable.Value format={formatForegroundStart} />
 				</Scrubbable.Root>
-				<VideoFramePreview
-					src={selectedVideoUrl}
-					time={selectedVideoDuration * foregroundStart}
-					label={`Foreground start at ${formatVideoTime(foregroundStart)}`}
-				/>
+				{#if draft.backgroundType === 'video'}
+					<VideoFramePreview
+						src={selectedVideoUrl}
+						time={selectedVideoDuration * foregroundStart}
+						label={`Foreground start at ${formatVideoTime(foregroundStart)}`}
+					/>
+				{/if}
 			</Field.Field>
 		{/if}
 	</Field.Set>
